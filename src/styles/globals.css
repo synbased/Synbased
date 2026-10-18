@@ -422,7 +422,7 @@ button[data-label]:hover::after {display: block;}
 .form-section .form-group input[type="number"]::-webkit-inner-spin-button {-webkit-appearance: none; margin: 0;}
 .form-section h2, .form-section h3 {margin: 0;}
 
-.row-section {display: grid; grid-template-columns: 1fr 3fr; gap: var(--space30); padding: var(--space10) 0; box-sizing: border-box;}
+.row-section {display: grid; grid-template-columns: 2fr 3fr; gap: var(--space30); padding: var(--space10) 0; box-sizing: border-box;}
 .row-section .information .title {display: block; font-weight: bold;}
 .row-section .information .description {color: var(--font-color2); font-size: var(--fontsize2);}
 .row-section > div > *:first-child {margin-top: 0;}
@@ -539,12 +539,16 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 /* Het icoon boven de titel, zoals bij Inbox als er nog geen bericht open staat */
 .empty-state > svg {display: block; margin: 0 auto var(--space10);}
 
-.toast {position: fixed; bottom: var(--space20); right: var(--space20); background: var(--color2); border-radius: var(--border-radius2); color: inherit; box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.08), 0px 8px 10px rgba(0, 0, 0, 0.1); min-width: 300px; max-width: 400px; z-index: 20; animation: slideIn 0.3s ease-out; border: 1px solid var(--border-color); padding: var(--space15); box-sizing: border-box; display: grid; grid-template-columns: 16px 1fr; gap: var(--space10);}
-.toast .toast-content {line-height: 1.35em; font-size: var(--fontsize2); font-weight: 500;}
-.toast .toast-content .toast-title {grid-column-start: 2; }
-.toast .toast-content .toast-description {grid-column-start: 2; color: var(--font-color2);}
-.toast.error {color: var(--color6);}
-.toast.success {color: var(--color7);}
+.toast {position: fixed; bottom: var(--space20); right: var(--space20); z-index: 20; display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: var(--space15); min-width: 320px; max-width: 420px; padding: var(--space15) var(--space15) var(--space15) var(--space20); box-sizing: border-box; background: var(--color2); border-radius: 16px; color: var(--font-color1); box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.08), 0px 8px 10px rgba(0, 0, 0, 0.1); animation: slideIn 0.3s ease-out;}
+/* Alleen het icoon heeft de kleur van de melding; de tekst blijft rustig zwart en grijs */
+.toast > svg {color: var(--font-color2);}
+.toast.success > svg {color: var(--color7);}
+.toast.error > svg {color: var(--color6);}
+.toast .toast-content {line-height: 1.4em; font-size: var(--fontsize1);}
+.toast .toast-content .toast-title {font-weight: 500;}
+.toast .toast-content .toast-description {color: var(--font-color2);}
+.toast .toast-close {display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; color: var(--font-color2); line-height: 0;}
+.toast .toast-close:hover {background: var(--color4); color: var(--font-color1);}
 
 .error-message {padding: var(--space15); background-color: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b; margin-bottom: var(--space20); border-radius: var(--border-radius1);}
 

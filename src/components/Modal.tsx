@@ -37,14 +37,17 @@ export default function Modal({
   if (type === 'toast') {
     return (
       <div className={`toast ${variant}`}>
-        {variant === 'success' && <CircleCheck size={16} />}
-        {variant === 'error' && <CircleX size={16} />}
-        {variant === 'warning' && <CircleAlert size={16} />}
-        {variant === 'info' && <CircleQuestionMark size={16} />}
+        {variant === 'success' && <CircleCheck size={20} />}
+        {variant === 'error' && <CircleX size={20} />}
+        {variant === 'warning' && <CircleAlert size={20} />}
+        {variant === 'info' && <CircleQuestionMark size={20} />}
         <div className="toast-content">
             <div className="toast-title">{title}</div>
             <div className="toast-description">{children}</div>
         </div>
+        <button type="button" className="toast-close" aria-label="Melding sluiten" onClick={onClose}>
+          <X size={18} />
+        </button>
       </div>
     );
   }

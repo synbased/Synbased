@@ -1,6 +1,7 @@
 import { createContext, Fragment, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import {
+  X,
   ChartColumn,
   CircleCheck,
   FilePen,
@@ -144,11 +145,14 @@ function Toast({ at, title, message }: { at: number; title: string; message: str
   if (t < at) return null;
   return (
     <div data-demo="toast" className="toast success">
-      <CircleCheck size={16} />
+      <CircleCheck size={20} />
       <div className="toast-content">
         <div className="toast-title">{title}</div>
         <div className="toast-description">{message}</div>
       </div>
+      <span className="toast-close">
+        <X size={18} />
+      </span>
     </div>
   );
 }

@@ -1,13 +1,24 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { pageTitle } from '@/lib/constants';
 
+/** De pagina's in het menu, bovenin en in het mobiele menu */
+const NAVIGATION = [
+  { href: '/modules', label: 'Modules' },
+  { href: '/pricing', label: 'Prijzen' },
+  { href: '/faq', label: 'Vragen' },
+];
+
 /**
  * De omlijsting van de website op synbased.com: kop met menu, en de voet.
  * Wie al ingelogd is, ziet "Naar dashboard" in plaats van "Inloggen".
+ *
+ * Op een smal scherm vervangt een menuknop de links, zoals op vercel.com: het
+ * menu vult dan het scherm onder de kop, met de knoppen bovenaan.
  */
 export default function SiteLayout({
   title,
@@ -21,6 +32,41 @@ export default function SiteLayout({
 }) {
   const { status } = useSession();
   const loggedIn = status === 'authenticated';
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Een link is actief op zijn eigen pagina en alles daaronder, zoals /modules/quotes
+  const isActive = (href: string) => router.pathname === href || router.pathname.startsWith(`${href}/`);
+
+  // Naar een andere pagina: het menu dicht
+  useEffect(() => setMenuOpen(false), [router.asPath]);
+
+  // Met het menu open scrolt de pagina erachter niet mee, en Escape sluit hem
+  useEffect(() => {
+    if (!menuOpen) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const actions = loggedIn ? (
+    <Link href="/app/dashboard" className="button">
+      Naar dashboard
+    </Link>
+  ) : (
+    <>
+      <Link href="/login" className="button tertiary">
+        Inloggen
+      </Link>
+      <Link href="/demo" className="button">
+        Demo aanvragen
+      </Link>
+    </>
+  );
 
   return (
     <div className="site">
@@ -40,28 +86,37 @@ export default function SiteLayout({
           </Link>
 
           <nav className="site-nav" aria-label="Hoofdmenu">
-            <Link href="/modules">Modules</Link>
-            <Link href="/pricing">Prijzen</Link>
-            <Link href="/faq">Vragen</Link>
+            {NAVIGATION.map(({ href, label }) => (
+              <Link key={href} href={href} className={isActive(href) ? 'active' : ''}>
+                {label}
+              </Link>
+            ))}
           </nav>
 
-          <div className="site-actions">
-            {loggedIn ? (
-              <Link href="/app/dashboard" className="button">
-                Naar dashboard
-              </Link>
-            ) : (
-              <>
-                <Link href="/login" className="button tertiary">
-                  Inloggen
-                </Link>
-                <Link href="/demo" className="button">
-                  Demo aanvragen
-                </Link>
-              </>
-            )}
-          </div>
+          <div className="site-actions">{actions}</div>
+
+          <button
+            type="button"
+            className={`site-menu-button${menuOpen ? ' open' : ''}`}
+            aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <span />
+            <span />
+          </button>
         </div>
+
+        {menuOpen && (
+          <nav className="site-mobile-menu" aria-label="Menu">
+            <div className="site-mobile-actions">{actions}</div>
+            {NAVIGATION.map(({ href, label }) => (
+              <Link key={href} href={href} className={isActive(href) ? 'active' : ''}>
+                {label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </header>
 
       <main>{children}</main>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import { CircleCheck, CircleX, CircleAlert, Info } from 'lucide-react';
+import { CircleCheck, CircleX, CircleAlert, Info, X } from 'lucide-react';
 
 interface Toast {
   id: string;
@@ -35,6 +35,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     }, 5000);
   }, []);
 
+  const dismiss = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
+
   const success = useCallback((title: string, message: string) => {
     showToast(title, message, 'success');
   }, [showToast]);
@@ -60,14 +64,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           className={`toast ${toast.variant}`}
           style={{ bottom: `${20 + index * 90}px` }}
         >
-          {toast.variant === 'success' && <CircleCheck size={16} />}
-          {toast.variant === 'error' && <CircleX size={16} />}
-          {toast.variant === 'warning' && <CircleAlert size={16} />}
-          {toast.variant === 'info' && <Info size={16} />}
+          {toast.variant === 'success' && <CircleCheck size={20} />}
+          {toast.variant === 'error' && <CircleX size={20} />}
+          {toast.variant === 'warning' && <CircleAlert size={20} />}
+          {toast.variant === 'info' && <Info size={20} />}
           <div className="toast-content">
             <div className="toast-title">{toast.title}</div>
             <div className="toast-description">{toast.message}</div>
           </div>
+          <button type="button" className="toast-close" aria-label="Melding sluiten" onClick={() => dismiss(toast.id)}>
+            <X size={18} />
+          </button>
         </div>
       ))}
     </ToastContext.Provider>

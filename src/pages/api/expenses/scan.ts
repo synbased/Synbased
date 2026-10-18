@@ -8,6 +8,8 @@ export const config = {
   api: {
     bodyParser: { sizeLimit: '4.5mb' },
   },
+  // Is de AI even overbelast, dan probeert hij het opnieuw; dat mag wat langer duren
+  maxDuration: 60,
 };
 
 /**

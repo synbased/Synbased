@@ -533,7 +533,7 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 
 .file-upload .file-error {font-size: var(--fontsize2); color: var(--color6); margin: 0;}
 
-.empty-state {text-align: center; padding: var(--space100) 0; max-width: 600px; margin: 0 auto;}
+.empty-state {text-align: center; padding: var(--space100) 0; max-width: 500px; margin: 0 auto;}
 .empty-state p {color: var(--font-color2);}
 .empty-state .button {display: inline-block;}
 /* Het icoon boven de titel, zoals bij Inbox als er nog geen bericht open staat */

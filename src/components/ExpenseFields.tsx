@@ -71,8 +71,9 @@ export function linesForSave(lines: ExpenseLineForm[]) {
 }
 
 /**
- * Een foto als JPEG van hooguit 2000 pixels, zodat hij past (de grens is 3 MB)
- * en de AI hem snel leest. Een PDF gaat ongewijzigd mee.
+ * Een foto als JPEG van hooguit 1600 pixels: scherp genoeg voor elke bon, klein
+ * genoeg om snel te uploaden en snel te laten lezen (de grens is 3 MB). Een
+ * PDF gaat ongewijzigd mee.
  */
 export function readFileForUpload(file: File): Promise<ExpenseFile> {
   return new Promise((resolve, reject) => {
@@ -88,7 +89,7 @@ export function readFileForUpload(file: File): Promise<ExpenseFile> {
       const image = new Image();
       image.onerror = () => reject(new Error('Deze foto kon niet gelezen worden'));
       image.onload = () => {
-        const scale = Math.min(1, 2000 / Math.max(image.width, image.height));
+        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(image.width * scale);
         canvas.height = Math.round(image.height * scale);

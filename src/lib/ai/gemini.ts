@@ -1,4 +1,4 @@
-import { ApiError, GoogleGenAI } from '@google/genai';
+import { ApiError, GoogleGenAI, ThinkingLevel, type ThinkingConfig } from '@google/genai';
 import { z } from 'zod';
 import { RECEIPT_PROMPT, buildUserPrompt, systemPrompt } from './prompt';
 import { AiKeyError, QuoteProposalSchema, ReceiptReadingSchema, type AiProvider } from './types';
@@ -73,8 +73,11 @@ export const gemini: AiProvider = {
   },
 
   async readReceipt(apiKey, file) {
-    try {
-      const response = await client(apiKey).models.generateContent({
+    // Een bon overnemen is geen denkwerk; zonder nadenken is Flash vele malen
+    // sneller. Nieuwe Flash-modellen kennen een denkniveau, Gemini 2.5 een
+    // budget; kent het model het niveau niet, dan proberen we het budget
+    const read = (thinkingConfig: ThinkingConfig) =>
+      client(apiKey).models.generateContent({
         model: MODEL,
         contents: [
           {
@@ -89,8 +92,18 @@ export const gemini: AiProvider = {
           systemInstruction: RECEIPT_PROMPT,
           responseMimeType: 'application/json',
           responseJsonSchema: RECEIPT_SCHEMA,
+          thinkingConfig,
         },
       });
+
+    try {
+      let response;
+      try {
+        response = await read({ thinkingLevel: ThinkingLevel.MINIMAL });
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error;
+        response = await read({ thinkingBudget: 0 });
+      }
 
       const parsed = ReceiptReadingSchema.safeParse(JSON.parse(response.text || 'null'));
       if (!parsed.success) throw new Error('De AI kon dit bestand niet lezen. Vul de gegevens met de hand in.');

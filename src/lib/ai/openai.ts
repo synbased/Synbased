@@ -72,6 +72,8 @@ export const openai: AiProvider = {
       const response = await client(apiKey).responses.parse({
         model: MODEL,
         instructions: RECEIPT_PROMPT,
+        // Overtikwerk, geen denkwerk: zo kort mogelijk nadenken is veel sneller
+        reasoning: { effort: 'low' },
         input: [
           {
             role: 'user',

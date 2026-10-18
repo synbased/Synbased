@@ -12,6 +12,12 @@ import { AiKeyError, QuoteProposalSchema, ReceiptReadingSchema, type AiProvider 
  */
 const MODEL = 'claude-opus-5-5';
 
+/**
+ * Een bon overnemen is eenvoudig lees- en overtikwerk; Sonnet doet dat even
+ * goed en een stuk sneller dan Opus.
+ */
+const RECEIPT_MODEL = 'claude-sonnet-5-5';
+
 function client(apiKey: string) {
   return new Anthropic({ apiKey });
 }
@@ -78,7 +84,7 @@ export const anthropic: AiProvider = {
           : { type: 'image' as const, source: { type: 'base64' as const, media_type: file.mediaType as 'image/jpeg' | 'image/png' | 'image/webp', data: file.base64 } };
 
       const response = await client(apiKey).beta.messages.parse({
-        model: MODEL,
+        model: RECEIPT_MODEL,
         max_tokens: 4000,
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',

@@ -157,6 +157,7 @@ button {font-family: var(--font-family1); font-size: var(--fontsize2); backgroun
 .sidebar .logo .expand .expand-icon {position: absolute; inset: 0; margin: auto; opacity: 0; transition: .2s all ease;}
 .sidebar .logo .expand:hover .sidebar-logo {opacity: 0;}
 .sidebar .logo .expand:hover .expand-icon {opacity: 1;}
+.sidebar .logo .site-menu-button {display: none;}
 
 /* Ingeklapt: alleen de iconen, met de naam als label bij hover */
 .sidebar.collapsed {width: 56px;}
@@ -884,6 +885,44 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 @media (max-width: 1100px) {
   .grid.four {grid-template-columns: repeat(2, minmax(0, 1fr));}
   .grid.two {grid-template-columns: 1fr;}
+}
+
+/* Telefoon: de zijbalk wordt een balk bovenin met de menuknop van de website,
+   en wat naast elkaar stond komt onder elkaar */
+@media (max-width: 768px) {
+  .layout {flex-direction: column;}
+  .sidebar, .sidebar.collapsed {width: 100%; height: auto; z-index: 20; border-right: 0; border-bottom: 1px solid var(--border-color);}
+  .sidebar.open {height: 100dvh;}
+  .sidebar .logo, .sidebar.collapsed .logo {justify-content: space-between; padding: var(--space10) var(--space15);}
+  .sidebar .logo .collapse, .sidebar .logo .expand .expand-icon {display: none;}
+  .sidebar .logo .expand:hover .sidebar-logo {opacity: 1;}
+  .sidebar .logo .site-menu-button, .sidebar .logo .site-menu-button:hover {display: block; width: 32px; height: 32px; border-radius: 50%; background: var(--color2);}
+  .sidebar .logo .site-menu-button.open {background: none;}
+  .sidebar .navigation, .sidebar .profile {display: none;}
+  .sidebar.open .navigation {display: flex; overflow-y: auto;}
+  .sidebar.open .profile {display: flex;}
+  .sidebar .navigation a, .sidebar.collapsed .navigation a {justify-content: flex-start; margin: 0 var(--space5); padding: var(--space10); font-size: var(--fontsize1);}
+  .sidebar.collapsed .navigation a .label {display: inline;}
+  .sidebar.collapsed .navigation a::after {content: none;}
+  .sidebar.collapsed .navigation a .count {position: static; min-width: 0; padding: 0 var(--space5); font-size: inherit;}
+  .sidebar.collapsed .profile {justify-content: flex-start; padding: var(--space5) var(--space10);}
+  .sidebar.collapsed .profile .info {display: block;}
+
+  .content {padding: var(--space15);}
+  .content .header {flex-wrap: wrap; gap: var(--space10);}
+  .content .header .actions {flex-wrap: wrap;}
+  /* minmax(0, ...): anders wordt een kolom zo breed als een tabel erin */
+  .grid, .grid.two, .grid.four, .content .grid:has(.block.page-navigation) {grid-template-columns: minmax(0, 1fr);}
+  .row-section {grid-template-columns: 1fr; gap: var(--space5);}
+  .form-section .form-row {flex-direction: column;}
+  .pagination .page-nav {flex-wrap: wrap; gap: var(--space10);}
+  .pagination .page-nav > span {white-space: nowrap;}
+
+  /* Een tabel scrolt binnen zijn blok; het actiemenu komt onderaan het scherm */
+  .table-container {overflow-x: auto;}
+  .table-container .data-table th, .table-container .data-table td {white-space: nowrap;}
+  .table-container .data-table tr td.actions .action-dropdown .action-menu,
+  .table-container .data-table tr td.actions .action-dropdown.up .action-menu {position: fixed; top: auto; bottom: var(--space10); left: var(--space10); right: var(--space10); z-index: 30;}
 }
 
 @media print {

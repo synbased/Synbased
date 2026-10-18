@@ -24,6 +24,32 @@ export default function Sidebar() {
   const dropdownRef = useRef<HTMLDivElement>(null);
   // Ingeklapt blijven alleen de iconen over; een klik op het logo klapt hem weer uit
   const [collapsed, setCollapsed] = useState(rememberedCollapsed ?? false);
+  // Op een telefoon is de zijbalk een balk bovenin; de menuknop klapt het menu
+  // over het hele scherm open, net als op de website
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Naar een andere pagina: het menu dicht
+  useEffect(() => setMenuOpen(false), [router.asPath]);
+
+  // Wordt het scherm breed genoeg voor de gewone zijbalk, dan gaat het menu dicht
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 769px)');
+    const onChange = () => wide.matches && setMenuOpen(false);
+    wide.addEventListener('change', onChange);
+    return () => wide.removeEventListener('change', onChange);
+  }, []);
+
+  // Met het menu open scrolt de pagina erachter niet mee, en Escape sluit hem
+  useEffect(() => {
+    if (!menuOpen) return;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setMenuOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     if (rememberedCollapsed !== null) return;
@@ -77,7 +103,7 @@ export default function Sidebar() {
   const userEmail = (session?.user as any)?.email || '';
 
   return (
-    <div className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+    <div className={`sidebar${collapsed ? ' collapsed' : ''}${menuOpen ? ' open' : ''}`}>
       <div className="logo">
         {collapsed ? (
           // Ingeklapt is het logo de knop om uit te klappen; bij hover zie je dat
@@ -93,6 +119,16 @@ export default function Sidebar() {
             </button>
           </>
         )}
+        <button
+          type="button"
+          className={`site-menu-button${menuOpen ? ' open' : ''}`}
+          aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <span />
+          <span />
+        </button>
       </div>
       <nav className="navigation">
         <Link href="/app/dashboard" className={isActive('/app/dashboard') ? 'active' : ''} data-label="Dashboard">

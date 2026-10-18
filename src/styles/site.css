@@ -23,13 +23,13 @@
    dat een kruisje wordt, en een menu dat het scherm onder de kop vult. De kop
    heeft een backdrop-filter, dus het menu hangt eronder in plaats van vast
    aan het scherm */
-.site .site-menu-button {display: none; position: relative; flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-color); border-radius: 50%; background: var(--color2); cursor: pointer;}
-.site .site-menu-button span {position: absolute; left: 9px; width: 12px; height: 1.5px; border-radius: 1px; background: var(--font-color1); transition: top .2s ease, transform .2s ease;}
-.site .site-menu-button span:first-child {top: 12px;}
-.site .site-menu-button span:last-child {top: 17px;}
-.site .site-menu-button.open {border-color: transparent;}
-.site .site-menu-button.open span:first-child {top: 14.5px; transform: rotate(45deg);}
-.site .site-menu-button.open span:last-child {top: 14.5px; transform: rotate(-45deg);}
+.site-menu-button {display: none; position: relative; flex: 0 0 auto; width: 32px; height: 32px; padding: 0; border: 1px solid var(--border-color); border-radius: 50%; background: var(--color2); cursor: pointer;}
+.site-menu-button span {position: absolute; left: 9px; width: 12px; height: 1.5px; border-radius: 1px; background: var(--font-color1); transition: top .2s ease, transform .2s ease;}
+.site-menu-button span:first-child {top: 12px;}
+.site-menu-button span:last-child {top: 17px;}
+.site-menu-button.open {border-color: transparent;}
+.site-menu-button.open span:first-child {top: 14.5px; transform: rotate(45deg);}
+.site-menu-button.open span:last-child {top: 14.5px; transform: rotate(-45deg);}
 .site .site-mobile-menu {position: absolute; top: 100%; left: 0; right: 0; height: calc(100dvh - 64px); display: flex; flex-direction: column; padding: var(--space30) var(--space20); box-sizing: border-box; background: var(--color2); overflow-y: auto; animation: site-fade-in .15s ease;}
 .site .site-mobile-actions {display: flex; flex-direction: column; gap: var(--space10); margin: 0 0 var(--space20) 0;}
 .site .site-mobile-actions .button, .site .site-mobile-demo {width: 100%; padding: 14px var(--space20);}

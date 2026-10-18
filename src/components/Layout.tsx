@@ -27,6 +27,7 @@ export default function Layout({ children, title }: LayoutProps) {
   const head = (
     <Head>
       <title>{pageTitle(title)}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
     </Head>
   );
 

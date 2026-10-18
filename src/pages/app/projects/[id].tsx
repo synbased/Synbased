@@ -285,33 +285,35 @@ export default function ProjectPage() {
                 ))}
               </div>
 
-              <div className="block">
-                <div className="header">
-                  <h2>Termijnen</h2>
-                </div>
-                {progress.length === 0 ? (
-                  <div className="empty-state">
-                    <h3>Nog geen goedgekeurde offerte</h3>
-                    <p>Is de offerte van dit project getekend, dan factureer je hier in termijnen, zoals 30% vooraf.</p>
+              <div className="grid">
+                <div className="block">
+                  <div className="header">
+                    <h2>Termijnen</h2>
                   </div>
-                ) : (
-                  <Table headers={['Offerte', 'Offertebedrag', 'Gefactureerd', 'Voortgang']}>
-                    {progress.map((row) => (
-                      <tr key={row.quote_id}>
-                        <td>
-                          <Link href={`/app/quotes/${row.quote_id}`}>{row.quote_number}</Link>
-                        </td>
-                        <td>{formatCurrency(row.base)}</td>
-                        <td>{formatCurrency(row.billed)}</td>
-                        <td>
-                          <span className={`status-badge ${row.percentage >= 100 ? 'status-paid' : 'status-sent'}`}>
-                            {row.percentage}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </Table>
-                )}
+                  {progress.length === 0 ? (
+                    <div className="empty-state">
+                      <h3>Nog geen goedgekeurde offerte</h3>
+                      <p>Is de offerte van dit project getekend, dan factureer je hier in termijnen, zoals 30% vooraf.</p>
+                    </div>
+                  ) : (
+                    <Table headers={['Offerte', 'Offertebedrag', 'Gefactureerd', 'Voortgang']}>
+                      {progress.map((row) => (
+                        <tr key={row.quote_id}>
+                          <td>
+                            <Link href={`/app/quotes/${row.quote_id}`}>{row.quote_number}</Link>
+                          </td>
+                          <td>{formatCurrency(row.base)}</td>
+                          <td>{formatCurrency(row.billed)}</td>
+                          <td>
+                            <span className={`status-badge ${row.percentage >= 100 ? 'status-paid' : 'status-sent'}`}>
+                              {row.percentage}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </Table>
+                  )}
+                </div>
               </div>
             </>
           )}

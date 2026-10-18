@@ -172,6 +172,7 @@ export default function ExpenseFields({
             maxBytes={15 * 1024 * 1024}
             hint="JPG, PNG of PDF"
             disabled={scanning}
+            camera
             onSelect={onFileSelect}
             onRemove={onFileRemove}
           />

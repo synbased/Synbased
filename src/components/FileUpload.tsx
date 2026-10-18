@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Image as ImageIcon, Upload, X } from 'lucide-react';
+import { Camera, Image as ImageIcon, Upload, X } from 'lucide-react';
 
 interface FileUploadProps {
   /** Het gekozen bestand als data-URL; leeg als er nog niets is gekozen */
@@ -15,6 +15,8 @@ interface FileUploadProps {
   /** Regel onder de knop, bijvoorbeeld welke types mogen */
   hint?: string;
   disabled?: boolean;
+  /** Op een telefoon ook een knop die meteen de camera opent, voor een bonnetje */
+  camera?: boolean;
   onSelect: (file: File) => void;
   onRemove: () => void;
 }
@@ -58,10 +60,12 @@ export default function FileUpload({
   maxBytes,
   hint,
   disabled = false,
+  camera = false,
   onSelect,
   onRemove,
 }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -126,6 +130,27 @@ export default function FileUpload({
           event.target.value = '';
         }}
       />
+
+      {camera && (
+        <>
+          <button type="button" className="button tertiary camera" disabled={disabled} onClick={() => cameraRef.current?.click()}>
+            <Camera size={16} />
+            Foto maken
+          </button>
+          {/* capture opent de camera aan de achterkant in plaats van de bestanden */}
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style={{ display: 'none' }}
+            onChange={(event) => {
+              handleFile(event.target.files?.[0]);
+              event.target.value = '';
+            }}
+          />
+        </>
+      )}
 
       {error && <p className="file-error">{error}</p>}
 

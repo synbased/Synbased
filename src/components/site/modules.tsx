@@ -148,7 +148,7 @@ export const MODULES: SiteModule[] = [
     ],
     steps: [
       { title: 'Maak het project', text: 'Kies de klant en zet de offerte erbij.' },
-      { title: 'Factureer in termijnen', text: 'Een percentage van de getekende offerte, als concept om na te kijken.' },
+      { title: 'Leg de termijnen vast', text: 'Zoals 30% bij opdracht, 50% halverwege en 20% bij oplevering; per termijn één klik op Factureren.' },
       { title: 'Zie je marge', text: 'Bonnen bij het project komen van de omzet af.' },
     ],
     facts: [

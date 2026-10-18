@@ -754,6 +754,33 @@ CREATE INDEX IF NOT EXISTS notes_project_id_idx ON notes(project_id);
 
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 
+-- ------------------------------------------------------------
+-- 23. Termijnschema en betalingstermijn
+--
+-- Per project de termijnen vooraf, zoals 30% bij opdracht, 50% halverwege en
+-- 20% bij oplevering, met de factuur zodra die gemaakt is. En per bedrijf de
+-- betalingstermijn in dagen voor nieuwe facturen; leeg is 30 dagen.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS project_installments (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  -- De offerte waar de percentages over gaan
+  quote_id BIGINT REFERENCES quotes(id) ON DELETE SET NULL,
+  label TEXT NOT NULL,
+  percentage NUMERIC(5,2) NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  -- De factuur van deze termijn, zodra hij gemaakt is; een verwijderd concept maakt hem weer vrij
+  invoice_id BIGINT REFERENCES invoices(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS project_installments_project_id_idx ON project_installments(project_id);
+
+ALTER TABLE project_installments ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS invoice_payment_days INTEGER;
+
 -- De rechten opnieuw, zodat de nieuwe tabellen ze ook hebben
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
@@ -768,7 +795,7 @@ NOTIFY pgrst, 'reload schema';
 -- Controle achteraf
 --
 -- Eén opdracht, want de SQL-editor toont alleen de uitkomst van de laatste.
--- Er horen drieëntwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
+-- Er horen vierentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
 -- ergens NEE, dan is dat onderdeel niet gelukt.
 -- ------------------------------------------------------------
 SELECT 'Elementtypes offerte' AS controle,
@@ -931,4 +958,11 @@ UNION ALL SELECT 'Projecten',
        ) AND (
          SELECT count(*) FROM information_schema.columns
          WHERE table_schema = 'public' AND table_name IN ('quotes', 'invoices', 'expenses', 'notes') AND column_name = 'project_id'
-       ) = 4 THEN 'ja' ELSE 'NEE - onderdeel 22 niet gelukt' END;
+       ) = 4 THEN 'ja' ELSE 'NEE - onderdeel 22 niet gelukt' END
+
+UNION ALL SELECT 'Termijnschema en betalingstermijn',
+       CASE WHEN EXISTS (
+         SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'project_installments'
+       ) AND EXISTS (
+         SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'invoice_payment_days'
+       ) THEN 'ja' ELSE 'NEE - onderdeel 23 niet gelukt' END;

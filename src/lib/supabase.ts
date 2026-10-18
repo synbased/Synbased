@@ -68,6 +68,8 @@ export interface Tenant {
   quote_reminder_days: number | null;
   /** Zoveel dagen na de vervaldatum een betalingsherinnering, en daarna nog één; null is nooit */
   invoice_reminder_days: number | null;
+  /** Na zoveel dagen vervalt een nieuwe factuur; null is 30 dagen */
+  invoice_payment_days: number | null;
   /** Staand of liggend A4 voor offertes en facturen, met elk sjabloon */
   paper_orientation: 'portrait' | 'landscape';
   /** Afzendadres van deze aannemer; leeg betekent het systeemadres uit EMAIL_FROM */
@@ -246,6 +248,17 @@ export interface Project {
   description: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Eén termijn uit het schema van een project, met zijn factuur zodra die er is */
+export interface ProjectInstallment {
+  id: number;
+  project_id: number;
+  quote_id: number | null;
+  label: string;
+  percentage: number;
+  position: number;
+  invoice_id: number | null;
 }
 
 /** Eén regel van een kostenpost, met zijn eigen btw-tarief */

@@ -2,7 +2,7 @@ import HelpButton from '@/components/HelpButton';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ChartColumn, FilePen, FileText, Layers, Receipt, ReceiptEuro } from 'lucide-react';
+import { ChartColumn, FilePen, FileText, Layers, Receipt, ReceiptEuro, Trash2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import Table from '@/components/Table';
 import Modal from '@/components/Modal';
@@ -26,8 +26,33 @@ const KINDS: Record<'offertes' | 'facturen' | 'kosten' | 'notities', { api: stri
   notities: { api: 'notes', title: 'Notitie koppelen' },
 };
 
+interface ScheduleRow {
+  id: number;
+  label: string;
+  percentage: number;
+  amount: number;
+  invoice: { id: number; invoice_number: string | null; status: string } | null;
+}
+
+/** Een termijn zoals hij in het venster staat: het percentage als tekst, zodat je vrij kunt typen */
+interface ScheduleFormRow {
+  id?: number;
+  label: string;
+  percentage: string;
+  locked: boolean;
+}
+
+/** Zo begint een nieuw schema: de verdeling die in de bouw het meest voorkomt */
+const DEFAULT_SCHEDULE: ScheduleFormRow[] = [
+  { label: 'Bij opdracht', percentage: '30', locked: false },
+  { label: 'Halverwege', percentage: '50', locked: false },
+  { label: 'Bij oplevering', percentage: '20', locked: false },
+];
+
 interface Overview {
   project: any;
+  schedule: ScheduleRow[];
+  scheduleQuote: { id: number; quote_number: string; status: string } | null;
   quotes: any[];
   invoices: any[];
   expenses: any[];
@@ -53,8 +78,9 @@ export default function ProjectPage() {
   const [saving, setSaving] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
-  // De termijnfactuur: welke offerte, hoeveel procent en hoe hij heet
-  const [installment, setInstallment] = useState<{ quoteId: string; percentage: string; label: string } | null>(null);
+  // Het termijnschema bewerken: over welke offerte, en de termijnen
+  const [schedule, setSchedule] = useState<{ quoteId: string; rows: ScheduleFormRow[] } | null>(null);
+  const [invoicing, setInvoicing] = useState<number | null>(null);
   // Iets bestaands koppelen
   const [linking, setLinking] = useState<keyof typeof KINDS | null>(null);
   const [linkOptions, setLinkOptions] = useState<{ value: string; label: string }[]>([]);
@@ -125,21 +151,47 @@ export default function ProjectPage() {
     router.push('/app/projects');
   };
 
-  /** Een termijnfactuur als concept, en dan meteen naar die factuur */
-  const handleInstallment = async () => {
-    if (!installment) return;
-    const response = await fetch(`/api/projects/${id}/installment`, {
-      method: 'POST',
+  /** Opent het schema: het bestaande, of een voorstel van 30, 50 en 20% */
+  const openSchedule = () => {
+    if (!overview) return;
+    const quotes = overview.quotes;
+    const approved = quotes.find(q => q.status === 'approved');
+    setSchedule({
+      quoteId: String(overview.scheduleQuote?.id || approved?.id || quotes[0]?.id || ''),
+      rows: overview.schedule.length
+        ? overview.schedule.map(row => ({ id: row.id, label: row.label, percentage: String(row.percentage), locked: !!row.invoice }))
+        : DEFAULT_SCHEDULE.map(row => ({ ...row })),
+    });
+  };
+
+  const saveSchedule = async () => {
+    if (!schedule) return;
+    const response = await fetch(`/api/projects/${id}/installments`, {
+      method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        quoteId: Number(installment.quoteId),
-        percentage: Number(installment.percentage.replace(',', '.')),
-        label: installment.label,
+        quoteId: Number(schedule.quoteId),
+        rows: schedule.rows.map(row => ({ id: row.id, label: row.label, percentage: Number(row.percentage.replace(',', '.')) })),
       }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
+      toast.error('Fout', data.error || 'De termijnen konden niet worden opgeslagen');
+      return;
+    }
+    setSchedule(null);
+    toast.success('Opgeslagen', 'Het termijnschema staat klaar');
+    load();
+  };
+
+  /** Eén termijn factureren: een concept, en dan meteen naar die factuur */
+  const handleInvoiceInstallment = async (installmentId: number) => {
+    setInvoicing(installmentId);
+    const response = await fetch(`/api/projects/${id}/installments/${installmentId}`, { method: 'POST' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
       toast.error('Fout', data.error || 'De termijnfactuur kon niet gemaakt worden');
+      setInvoicing(null);
       return;
     }
     router.push(`/app/invoices/${data.id}`);
@@ -192,10 +244,11 @@ export default function ProjectPage() {
     );
   }
 
-  const { project, totals, progress } = overview;
+  const { project, totals } = overview;
   const customerQuery = project.customer_id ? `&customer_id=${project.customer_id}` : '';
   const customerOptions = customers.map(c => ({ value: String(c.id), label: getCustomerOptionLabel(c) }));
-  const approvedQuotes = progress.filter(p => p.percentage < 100);
+  const scheduleTotal = schedule ? schedule.rows.reduce((sum, row) => sum + (Number(row.percentage.replace(',', '.')) || 0), 0) : 0;
+  const canInvoice = overview.scheduleQuote?.status === 'approved';
 
   const navigation: { key: Tab; label: string; icon: typeof Layers; count?: number }[] = [
     { key: 'overzicht', label: 'Overzicht', icon: ChartColumn },
@@ -228,17 +281,6 @@ export default function ProjectPage() {
           <span className={`status-badge ${PROJECT_STATUS[project.status]?.className || ''}`}>
             {PROJECT_STATUS[project.status]?.label}
           </span>
-          {approvedQuotes.length > 0 && (
-            <button
-              type="button"
-              className="button cancel"
-              onClick={() =>
-                setInstallment({ quoteId: String(approvedQuotes[0].quote_id), percentage: '', label: `Termijn ${overview.invoices.filter(i => i.quote_id).length + 1}` })
-              }
-            >
-              Termijnfactuur maken
-            </button>
-          )}
           <button type="button" className="button" onClick={() => router.push('/app/projects')}>
             Terug
           </button>
@@ -289,29 +331,63 @@ export default function ProjectPage() {
                 <div className="block">
                   <div className="header">
                     <h2>Termijnen</h2>
+                    {overview.quotes.length > 0 && (
+                      <button type="button" className="button cancel" onClick={openSchedule}>
+                        {overview.schedule.length ? 'Termijnen wijzigen' : 'Termijnen vastleggen'}
+                      </button>
+                    )}
                   </div>
-                  {progress.length === 0 ? (
+                  {overview.quotes.length === 0 ? (
                     <div className="empty-state">
-                      <h3>Nog geen goedgekeurde offerte</h3>
-                      <p>Is de offerte van dit project getekend, dan factureer je hier in termijnen, zoals 30% vooraf.</p>
+                      <h3>Nog geen offerte bij dit project</h3>
+                      <p>Maak eerst een offerte bij dit project; daarna leg je hier vast in welke termijnen je hem factureert.</p>
+                    </div>
+                  ) : overview.schedule.length === 0 ? (
+                    <div className="empty-state">
+                      <h3>Nog geen termijnen</h3>
+                      <p>Leg vast in welke delen je de offerte factureert, zoals 30% bij opdracht, 50% halverwege en 20% bij oplevering.</p>
                     </div>
                   ) : (
-                    <Table headers={['Offerte', 'Offertebedrag', 'Gefactureerd', 'Voortgang']}>
-                      {progress.map((row) => (
-                        <tr key={row.quote_id}>
-                          <td>
-                            <Link href={`/app/quotes/${row.quote_id}`}>{row.quote_number}</Link>
-                          </td>
-                          <td>{formatCurrency(row.base)}</td>
-                          <td>{formatCurrency(row.billed)}</td>
-                          <td>
-                            <span className={`status-badge ${row.percentage >= 100 ? 'status-paid' : 'status-sent'}`}>
-                              {row.percentage}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </Table>
+                    <>
+                      {!canInvoice && overview.scheduleQuote && (
+                        <p className="field-note">
+                          Offerte {overview.scheduleQuote.quote_number} is nog niet goedgekeurd. Factureren kan zodra de klant
+                          tekent, of als je hem zelf op Goedgekeurd zet.
+                        </p>
+                      )}
+                      <Table headers={['Termijn', 'Deel', 'Bedrag excl. btw', 'Status', '']}>
+                        {overview.schedule.map((row) => (
+                          <tr key={row.id}>
+                            <td>{row.label}</td>
+                            <td>{row.percentage}%</td>
+                            <td>{formatCurrency(row.amount)}</td>
+                            <td>
+                              {row.invoice ? (
+                                <span className={`status-badge ${INVOICE_STATUS[row.invoice.status]?.className || ''}`}>
+                                  {INVOICE_STATUS[row.invoice.status]?.label || row.invoice.status}
+                                </span>
+                              ) : (
+                                <span className="status-badge status-draft">Te factureren</span>
+                              )}
+                            </td>
+                            <td className="actions">
+                              {row.invoice ? (
+                                <Link href={`/app/invoices/${row.invoice.id}`}>{row.invoice.invoice_number || 'Bekijken'}</Link>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="button cancel"
+                                  onClick={() => handleInvoiceInstallment(row.id)}
+                                  disabled={!canInvoice || invoicing !== null}
+                                >
+                                  {invoicing === row.id ? 'Bezig...' : 'Factureren'}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </Table>
+                    </>
                   )}
                 </div>
               </div>
@@ -466,53 +542,77 @@ export default function ProjectPage() {
         </div>
       </div>
 
-      <Modal isOpen={!!installment} onClose={() => setInstallment(null)} title="Termijnfactuur maken">
-        {installment && (
+      <Modal isOpen={!!schedule} onClose={() => setSchedule(null)} title="Termijnen">
+        {schedule && (
           <>
             <div className="form-section">
               <div className="form-group">
                 <label>Offerte</label>
                 <Select
-                  value={approvedQuotes.map(q => ({ value: String(q.quote_id), label: `${q.quote_number} · al ${q.percentage}% gefactureerd` })).find(o => o.value === installment.quoteId) || null}
-                  onChange={(option) => setInstallment({ ...installment, quoteId: option?.value || '' })}
-                  options={approvedQuotes.map(q => ({ value: String(q.quote_id), label: `${q.quote_number} · al ${q.percentage}% gefactureerd` }))}
+                  value={overview.quotes.map(q => ({ value: String(q.id), label: `${q.quote_number} · ${formatCurrency(q.base)} excl. btw` })).find(o => o.value === schedule.quoteId) || null}
+                  onChange={(option) => setSchedule({ ...schedule, quoteId: option?.value || '' })}
+                  options={overview.quotes.map(q => ({ value: String(q.id), label: `${q.quote_number} · ${formatCurrency(q.base)} excl. btw` }))}
                 />
               </div>
+              {schedule.rows.map((row, index) => (
+                <div key={index} className="form-row">
+                  <div className="form-group">
+                    {index === 0 && <label>Termijn</label>}
+                    <input
+                      type="text"
+                      value={row.label}
+                      disabled={row.locked}
+                      aria-label="Omschrijving van de termijn"
+                      onChange={(e) => setSchedule({ ...schedule, rows: schedule.rows.map((r, i) => (i === index ? { ...r, label: e.target.value } : r)) })}
+                      placeholder="Bijvoorbeeld: Bij opdracht"
+                    />
+                  </div>
+                  <div className="form-group">
+                    {index === 0 && <label>Percentage</label>}
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={row.percentage}
+                      disabled={row.locked}
+                      aria-label="Percentage"
+                      onChange={(e) => setSchedule({ ...schedule, rows: schedule.rows.map((r, i) => (i === index ? { ...r, percentage: e.target.value } : r)) })}
+                      placeholder="30"
+                    />
+                  </div>
+                  {!row.locked && schedule.rows.length > 1 && (
+                    <button
+                      type="button"
+                      className="button icon"
+                      aria-label="Termijn verwijderen"
+                      title="Termijn verwijderen"
+                      onClick={() => setSchedule({ ...schedule, rows: schedule.rows.filter((_, i) => i !== index) })}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
               <div className="form-row">
-                <div className="form-group">
-                  <label htmlFor="installment-label">Omschrijving</label>
-                  <input
-                    id="installment-label"
-                    type="text"
-                    value={installment.label}
-                    onChange={(e) => setInstallment({ ...installment, label: e.target.value })}
-                    placeholder="Bijvoorbeeld: Termijn 1, bij opdracht"
-                  />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="installment-percentage">Percentage</label>
-                  <input
-                    id="installment-percentage"
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={installment.percentage}
-                    onChange={(e) => setInstallment({ ...installment, percentage: e.target.value })}
-                    placeholder="Bijvoorbeeld 30"
-                  />
-                </div>
+                <button
+                  type="button"
+                  className="button cancel"
+                  onClick={() => setSchedule({ ...schedule, rows: [...schedule.rows, { label: '', percentage: '', locked: false }] })}
+                >
+                  Termijn toevoegen
+                </button>
               </div>
             </div>
             <p className="field-note">
-              Elke prijstabel van de offerte komt er als één regel op, met hetzelfde btw-tarief. Je krijgt een concept om
-              na te kijken voor je hem verstuurt.
+              Samen {Math.round(scheduleTotal * 100) / 100}% {Math.abs(scheduleTotal - 100) > 0.01 ? '; dat moet 100% zijn.' : 'van de offerte.'}{' '}
+              Termijnen die al gefactureerd zijn, blijven zoals ze zijn.
             </p>
             <div className="buttons">
-              <button type="button" className="button cancel" onClick={() => setInstallment(null)}>
+              <button type="button" className="button cancel" onClick={() => setSchedule(null)}>
                 Annuleren
               </button>
-              <button type="button" className="button" onClick={handleInstallment} disabled={!installment.quoteId || !installment.percentage}>
-                Factuur maken
+              <button type="button" className="button" onClick={saveSchedule} disabled={!schedule.quoteId || Math.abs(scheduleTotal - 100) > 0.01}>
+                Opslaan
               </button>
             </div>
           </>

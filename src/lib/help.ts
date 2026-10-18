@@ -103,8 +103,9 @@ export const HELP: Record<string, HelpTopic> = {
         title: 'Cijfers en termijnen',
         items: [
           'Het overzicht toont geoffreerd (goedgekeurde offertes), gefactureerd (verstuurde facturen) en de kosten, alles exclusief btw, met de marge die overblijft.',
-          'Met Termijnfactuur maken factureer je een deel van een goedgekeurde offerte, zoals 30% bij opdracht. Elke prijstabel komt er naar rato op, met hetzelfde btw-tarief; je krijgt een concept om na te kijken.',
-          'Meer dan 100% van een offerte factureren kan niet; je ziet per offerte hoeveel er al gefactureerd is.',
+          'Termijnen: maak eerst een offerte bij het project. Kies dan in het blok Termijnen "Termijnen vastleggen" en verdeel de offerte, zoals 30% bij opdracht, 50% halverwege en 20% bij oplevering; samen 100%.',
+          'Is de offerte goedgekeurd (getekend, of door jou op Goedgekeurd gezet), dan staat bij elke termijn de knop Factureren. Je krijgt een concept om na te kijken; elke prijstabel komt er naar rato op, met hetzelfde btw-tarief.',
+          'Per termijn zie je of hij nog gefactureerd moet worden, of de factuur verstuurd is en of hij betaald is. Een termijn die al gefactureerd is, kun je niet meer wijzigen.',
         ],
       },
     ],
@@ -143,6 +144,7 @@ export const HELP: Record<string, HelpTopic> = {
       {
         title: 'Zo werkt het',
         items: [
+          'De vervaldatum volgt de betalingstermijn bij Instellingen > Facturen (standaard 30 dagen); per factuur pas je hem aan.',
           'Een nieuwe factuur is een concept zonder nummer. Hij krijgt zijn nummer pas bij versturen, markeren als verzonden of markeren als betaald.',
           'Daarna ligt hij vast en kun je hem niet meer wijzigen of verwijderen.',
           'Een fout herstel je met een creditfactuur: die draait de factuur (of een deel ervan) terug.',

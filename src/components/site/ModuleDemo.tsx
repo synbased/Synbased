@@ -710,29 +710,34 @@ const SCENES: Record<string, (() => ReactNode)[]> = {
     ),
     () => {
       const t = useT();
+      const billed = t >= 2.4;
       return (
-        <AppPage active="projects" title="Badkamer Familie Verhoef" actions={<Button id="installment" kind="cancel" pressAt={1.4}>Termijnfactuur maken</Button>}>
-          <Stats
-            at={-99}
-            items={[
-              { label: 'Geoffreerd', value: 6040, note: 'Goedgekeurde offertes, excl. btw' },
-              { label: 'Gefactureerd', value: t >= 4.6 ? 4832 : 1812, note: 'Verstuurde facturen, excl. btw' },
-              { label: 'Kosten', value: 640.5, note: 'Bonnen en inkoopfacturen' },
-              { label: 'Marge', value: t >= 4.6 ? 4191.5 : 1171.5, note: 'Gefactureerd min kosten' },
-            ]}
-          />
-          <Dialog from={1.6} until={4.4} title="Termijnfactuur maken">
-            <div className="form-section">
-              <Field label="Omschrijving" text="Termijn 2, halverwege" at={1.9} perSecond={30} />
-              <Field label="Percentage" text="50" at={2.7} />
+        <AppPage active="projects" title="Badkamer Familie Verhoef" actions={<span className="status-badge status-sent">In uitvoering</span>}>
+          <div data-demo="schedule" className="block">
+            <div className="header">
+              <h2>Termijnen</h2>
+              <Button kind="cancel">Termijnen wijzigen</Button>
             </div>
-            <div className="buttons">
-              <Button kind="cancel">Annuleren</Button>
-              <Button id="create" pressAt={4.1}>Factuur maken</Button>
-            </div>
-          </Dialog>
-          <Cursor path={[['installment', 0.4], ['create', 3.1]]} />
-          <Toast at={4.4} title="Termijnfactuur" message="Termijn 2: 50% van OFF-118 staat klaar als concept" />
+            <DataTable
+              headers={['Termijn', 'Deel', 'Bedrag excl. btw', 'Status', '']}
+              rows={[
+                { cells: ['Bij opdracht', '30%', '€ 1.812,00', <Badge key="b" tone="paid">Betaald</Badge>, 'FAC-089'] },
+                {
+                  cells: [
+                    'Halverwege',
+                    '50%',
+                    '€ 3.020,00',
+                    billed ? <Badge tone="draft">Concept</Badge> : <Badge tone="draft">Te factureren</Badge>,
+                    billed ? 'Bekijken' : <Button id="bill" kind="cancel" pressAt={2}>Factureren</Button>,
+                  ],
+                  highlight: billed,
+                },
+                { cells: ['Bij oplevering', '20%', '€ 1.208,00', <Badge key="b" tone="draft">Te factureren</Badge>, <Button key="c" kind="cancel">Factureren</Button>] },
+              ]}
+            />
+          </div>
+          <Cursor path={[['bill', 1]]} />
+          <Toast at={2.4} title="Termijnfactuur" message="Halverwege: 50% van OFF-118 staat klaar als concept" />
         </AppPage>
       );
     },
@@ -1263,7 +1268,7 @@ const CAMERAS: Record<string, CameraPath[]> = {
     [],
   ],
   products: [[], [['suggest', 1.1, 1.4], [null, 4.8]], []],
-  projects: [[['stats', 0.3, 1.3], [null, 3.4]], [['dialog', 1.9, 1.3], [null, 4.4]], []],
+  projects: [[['stats', 0.3, 1.3], [null, 3.4]], [['schedule', 0.3, 1.3], [null, 4]], []],
   expenses: [[['form', 0.4, 1.25], [null, 5.2]], [], []],
   bank: [[], [['table', 0.3, 1.25], [null, 4.6]], []],
   vat: [[], [['due', 0.4, 1.4], [null, 4.6]], []],

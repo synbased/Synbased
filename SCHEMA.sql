@@ -56,6 +56,8 @@ CREATE TABLE tenants (
   quote_reminder_days INTEGER,
   -- Zoveel dagen na de vervaldatum een betalingsherinnering, en daarna nog één; null is nooit
   invoice_reminder_days INTEGER,
+  -- Na zoveel dagen vervalt een nieuwe factuur; leeg is 30 dagen
+  invoice_payment_days INTEGER,
   -- Staand of liggend A4 voor offertes en facturen, met elk sjabloon
   paper_orientation TEXT NOT NULL DEFAULT 'portrait'
     CHECK (paper_orientation IN ('portrait', 'landscape')),
@@ -366,6 +368,23 @@ ALTER TABLE quotes
 -- ------------------------------------------------------------
 -- Kosten: inkoopfacturen en bonnetjes. Het bestand zelf staat in Supabase
 -- Storage, in de afgeschermde bucket "documents".
+-- Termijnschema per project: de termijnen vooraf, met de factuur zodra die er is
+CREATE TABLE project_installments (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  -- De offerte waar de percentages over gaan
+  quote_id BIGINT REFERENCES quotes(id) ON DELETE SET NULL,
+  label TEXT NOT NULL,
+  percentage NUMERIC(5,2) NOT NULL,
+  position INTEGER NOT NULL DEFAULT 0,
+  -- De factuur van deze termijn, zodra hij gemaakt is; een verwijderd concept maakt hem weer vrij
+  invoice_id BIGINT REFERENCES invoices(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX project_installments_project_id_idx ON project_installments(project_id);
+
 -- ------------------------------------------------------------
 CREATE TABLE expenses (
   id BIGSERIAL PRIMARY KEY,
@@ -680,6 +699,7 @@ ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mollie_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_installments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;

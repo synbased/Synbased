@@ -24,6 +24,16 @@ export default function NewInvoice() {
   const router = useRouter();
   const projectOptions = useProjects();
 
+  // De vervaldatum volgt de betalingstermijn uit Instellingen > Facturen
+  useEffect(() => {
+    fetch('/api/tenant')
+      .then(res => (res.ok ? res.json() : null))
+      .then(tenant => {
+        if (tenant?.invoice_payment_days) setFormData(prev => ({ ...prev, due_date: overDagen(tenant.invoice_payment_days) }));
+      })
+      .catch(() => {});
+  }, []);
+
   // Vanuit een project staat dat project al goed
   useEffect(() => {
     if (typeof router.query.project_id === 'string') {

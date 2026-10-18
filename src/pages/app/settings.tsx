@@ -66,6 +66,7 @@ export default function Settings() {
         invoice_email_intro_text: '',
         quote_reminder_days: '',
         invoice_reminder_days: '',
+        invoice_payment_days: '',
     });
     // De herinnering staat aan of uit; het aantal dagen blijft bewaard als je hem even uitzet
     const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -262,6 +263,7 @@ export default function Settings() {
                     invoice_email_intro_text: tenant.invoice_email_intro_text || '',
                     quote_reminder_days: tenant.quote_reminder_days ? String(tenant.quote_reminder_days) : '',
                     invoice_reminder_days: tenant.invoice_reminder_days ? String(tenant.invoice_reminder_days) : '',
+                    invoice_payment_days: tenant.invoice_payment_days ? String(tenant.invoice_payment_days) : '',
                 });
                 setReminderEnabled(!!tenant.quote_reminder_days);
                 setInvoiceReminderEnabled(!!tenant.invoice_reminder_days);
@@ -354,6 +356,7 @@ export default function Settings() {
                 invoice_email_subject: emailSettings.invoice_email_subject,
                 invoice_email_intro_text: emailSettings.invoice_email_intro_text,
                 invoice_reminder_days: invoiceReminderEnabled ? emailSettings.invoice_reminder_days : '',
+                invoice_payment_days: emailSettings.invoice_payment_days,
             },
             'Factuurinstellingen opgeslagen'
         );
@@ -1136,6 +1139,28 @@ export default function Settings() {
                                             setNumbering({ ...numbering, invoice_number_next: e.target.value })
                                         }
                                         placeholder="Vul het volgende factuurnummer in"
+                                    />
+                                </div>
+                            </div>
+                            <div className="row-section">
+                                <div className="information">
+                                    <label className="title" htmlFor="invoice_payment_days">Betalingstermijn</label>
+                                    <span className="description">
+                                        Na zoveel dagen vervalt een nieuwe factuur, ook een termijnfactuur of een
+                                        factuur uit een offerte. Per factuur pas je de vervaldatum nog aan.
+                                    </span>
+                                </div>
+                                <div>
+                                    <input
+                                        id="invoice_payment_days"
+                                        type="number"
+                                        min={1}
+                                        max={90}
+                                        value={emailSettings.invoice_payment_days}
+                                        onChange={(e) =>
+                                            setEmailSettings({ ...emailSettings, invoice_payment_days: e.target.value })
+                                        }
+                                        placeholder="30 dagen"
                                     />
                                 </div>
                             </div>

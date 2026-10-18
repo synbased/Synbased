@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase';
-import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Project, Quote, Tenant, Note, Product } from './supabase';
+import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Project, ProjectInstallment, Quote, Tenant, Note, Product } from './supabase';
 import type { PurchaseVatType, SalesVatType } from './constants';
 import { calculateDocumentTotal, calculateElementTotals, lineTotal } from './utils';
 import { copyBlocks } from './blocks';
@@ -665,8 +665,30 @@ export async function getProjectOverview(id: string | number, tenantId: string) 
       return { quote_id: q.id, quote_number: q.quote_number, base: q.base, billed: cents(billed), percentage: Math.round((billed / q.base) * 100) };
     });
 
+  // Het termijnschema, met per termijn de status van zijn factuur
+  const { data: installments, error: installmentsError } = await supabase
+    .from('project_installments')
+    .select('id, project_id, quote_id, label, percentage, position, invoice_id')
+    .eq('tenant_id', tenantId)
+    .eq('project_id', id)
+    .order('position');
+  if (installmentsError) throw installmentsError;
+
+  const scheduleQuote = quoteRows.find(q => q.id === installments?.[0]?.quote_id) || null;
+  const schedule = (installments || []).map((row: any) => {
+    const invoice = invoiceRows.find(i => i.id === row.invoice_id);
+    return {
+      ...row,
+      percentage: Number(row.percentage),
+      amount: scheduleQuote ? cents((scheduleQuote.base * Number(row.percentage)) / 100) : 0,
+      invoice: invoice ? { id: invoice.id, invoice_number: invoice.invoice_number, status: invoice.status } : null,
+    };
+  });
+
   return {
     project,
+    schedule,
+    scheduleQuote: scheduleQuote ? { id: scheduleQuote.id, quote_number: scheduleQuote.quote_number, status: scheduleQuote.status } : null,
     quotes: quoteRows,
     invoices: invoiceRows,
     expenses: expenses.data || [],
@@ -737,7 +759,7 @@ export async function createInstallmentInvoice(
       tenant_id: tenantId,
       customer_id: quote.customer_id,
       invoice_date: today,
-      due_date: dagenErbij(today, 14),
+      due_date: dagenErbij(today, await paymentDays(tenantId)),
       total: calculateDocumentTotal(blocks),
       status: 'draft',
       currency: quote.currency,
@@ -748,6 +770,101 @@ export async function createInstallmentInvoice(
     } as Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
     blocks
   );
+}
+
+/** Na hoeveel dagen een nieuwe factuur vervalt: de instelling van het bedrijf, of 30 */
+export async function paymentDays(tenantId: string): Promise<number> {
+  const tenant = await getTenant(tenantId);
+  return tenant.invoice_payment_days || 30;
+}
+
+/**
+ * Het termijnschema van een project vastleggen: de termijnen over één offerte,
+ * samen precies 100%. Termijnen die al een factuur hebben blijven zoals ze
+ * zijn; de rest wordt vervangen door wat er nu ingevuld is.
+ */
+export async function saveInstallments(
+  projectId: string | number,
+  tenantId: string,
+  quoteId: number,
+  rows: { id?: number; label: string; percentage: number }[]
+) {
+  const project = await getProject(projectId, tenantId);
+  const quote = await getQuote(quoteId, tenantId);
+  if (quote.project_id !== project.id) throw new Error('Deze offerte hoort niet bij dit project');
+
+  const { data: existing, error } = await supabase
+    .from('project_installments')
+    .select('id, label, percentage, position, invoice_id, quote_id')
+    .eq('tenant_id', tenantId)
+    .eq('project_id', project.id);
+  if (error) throw error;
+
+  const invoiced = (existing || []).filter((row: any) => row.invoice_id);
+  if (invoiced.some((row: any) => row.quote_id !== quote.id)) {
+    throw new Error('Er zijn al termijnen gefactureerd over een andere offerte');
+  }
+
+  const invoicedIds = new Set(invoiced.map((row: any) => row.id));
+  const open = rows
+    .filter(row => !row.id || !invoicedIds.has(row.id))
+    .map(row => ({ label: String(row.label || '').trim(), percentage: Math.round((Number(row.percentage) || 0) * 100) / 100 }))
+    .filter(row => row.percentage > 0);
+  if (open.some(row => !row.label)) throw new Error('Geef elke termijn een omschrijving');
+
+  const total = invoiced.reduce((sum: number, row: any) => sum + Number(row.percentage), 0) + open.reduce((sum, row) => sum + row.percentage, 0);
+  if (Math.abs(total - 100) > 0.01) throw new Error(`De termijnen zijn samen ${Math.round(total * 100) / 100}%; dat moet 100% zijn`);
+
+  const { error: deleteError } = await supabase
+    .from('project_installments')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('project_id', project.id)
+    .is('invoice_id', null);
+  if (deleteError) throw deleteError;
+
+  if (open.length) {
+    const { error: insertError } = await supabase.from('project_installments').insert(
+      open.map((row, index) => ({
+        tenant_id: tenantId,
+        project_id: project.id,
+        quote_id: quote.id,
+        label: row.label,
+        percentage: row.percentage,
+        position: invoiced.length + index,
+      }))
+    );
+    if (insertError) throw insertError;
+  }
+}
+
+/** Een termijn uit het schema factureren: een concept van zijn percentage van de offerte */
+export async function invoiceInstallment(projectId: string | number, tenantId: string, installmentId: string | number) {
+  const { data: row, error } = await supabase
+    .from('project_installments')
+    .select('*')
+    .eq('id', installmentId)
+    .eq('tenant_id', tenantId)
+    .eq('project_id', projectId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) throw new Error('Termijn niet gevonden');
+  if (row.invoice_id) throw new Error('Deze termijn is al gefactureerd');
+  if (!row.quote_id) throw new Error('De offerte van dit schema bestaat niet meer; leg de termijnen opnieuw vast');
+
+  const invoice = await createInstallmentInvoice(projectId, tenantId, {
+    quoteId: row.quote_id,
+    percentage: Number(row.percentage),
+    label: row.label,
+  });
+
+  const { error: updateError } = await supabase
+    .from('project_installments')
+    .update({ invoice_id: invoice.id })
+    .eq('id', row.id);
+  if (updateError) throw updateError;
+
+  return invoice as Invoice & { installment?: ProjectInstallment };
 }
 
 /** Het element met de klant, het nummer en de datums bovenaan een document */
@@ -1173,7 +1290,7 @@ export async function convertQuoteToInvoice(quoteId: string | number, tenantId: 
       tenant_id: tenantId,
       customer_id: quote.customer_id,
       invoice_date: today,
-      due_date: dagenErbij(today, 30),
+      due_date: dagenErbij(today, await paymentDays(tenantId)),
       total: calculateDocumentTotal(blocks),
       status: 'draft',
       currency: quote.currency,

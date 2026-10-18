@@ -27,6 +27,7 @@ const EDITABLE_FIELDS = [
   'invoice_number_next',
   'quote_reminder_days',
   'invoice_reminder_days',
+  'invoice_payment_days',
   'paper_orientation',
 ] as const;
 
@@ -76,6 +77,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Kies voor de herinnering een aantal dagen tussen 1 en 60' });
         }
         updates[field] = value;
+      }
+
+      // De betalingstermijn: 1 tot 90 dagen, of leeg voor 30
+      const paymentDays = updates.invoice_payment_days;
+      if (paymentDays !== undefined && paymentDays !== null) {
+        const value = Number(paymentDays);
+        if (!Number.isInteger(value) || value < 1 || value > 90) {
+          return res.status(400).json({ error: 'Kies een betalingstermijn tussen 1 en 90 dagen' });
+        }
+        updates.invoice_payment_days = value;
       }
 
       const tenant = await updateTenant(tenantId, updates);

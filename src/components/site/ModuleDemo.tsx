@@ -1174,91 +1174,31 @@ function RevenueLegend({ at }: { at: number }) {
 
 /**
  * De camera per scène, zoals in een productvideo: [doel, moment, zoom]. Op
- * elk moment zoomt hij soepel in op het element met data-demo="doel"; null
- * is weer het hele scherm. Zonder pad blijft hij op het hele scherm.
+ * het moment zoomt hij rustig in op het element met data-demo="doel"; null is
+ * weer het hele scherm. Zonder pad blijft hij op het hele scherm.
  */
 type CameraPath = [string | null, number, number?][];
 
-const MAIL_CAMERAS: CameraPath[] = [
-  [['plugin', 0.3, 1.8], ['toast', 2.7, 1.8], [null, 4.5]],
-  [['mails', 0.2, 1.4], [null, 3.5]],
-  [['new', 0.4, 2], ['event', 2.1, 1.9], [null, 4.5]],
-];
-
+// Hooguit één keer inzoomen per stap, alleen waar het detail klein is, en rustig
 const CAMERAS: Record<string, CameraPath[]> = {
   quotes: [
-    [['lines', 0.3, 1.6], ['total', 4.9, 1.9], [null, 6.2]],
-    [['send', 0.4, 1.9], ['dialog', 2, 1.6], [null, 3.9], ['toast', 4.3, 1.9], [null, 6.2]],
-    [['signature', 0.8, 1.8], ['sign', 3.2, 2], [null, 5.4]],
-    [['table', 0.4, 1.5], ['convert', 2.2, 2], ['toast', 3.8, 1.9], [null, 5.8]],
+    [['lines', 0.4, 1.35], [null, 5.6]],
+    [['dialog', 1.9, 1.3], [null, 4.2]],
+    [['signature', 0.8, 1.45], [null, 4.6]],
+    [],
   ],
   invoices: [
-    [['lines', 0.3, 1.7], ['meta', 3.4, 2], [null, 5.4]],
-    [['send', 0.4, 1.9], ['dialog', 2, 1.6], ['meta', 4.1, 2], [null, 6]],
-    [['table', 0.6, 1.6], ['toast', 2.6, 1.9], [null, 5]],
+    [['lines', 0.4, 1.35], [null, 4.4]],
+    [['dialog', 1.9, 1.3], [null, 4.2]],
+    [],
   ],
-  customers: [
-    [['form', 0.2, 1.4], ['save', 3.4, 2], ['toast', 5, 1.9], [null, 6.5]],
-    [['tab', 0.4, 2], ['table', 2, 1.5], [null, 4.5]],
-    [['lines', 0.5, 1.8], [null, 4]],
-  ],
-  products: [
-    [['dialog', 0.4, 1.6], ['save', 2.8, 2], ['table', 4.3, 1.5], [null, 6]],
-    [['suggest', 0.4, 1.9], ['amount', 3.6, 1.9], [null, 5.5]],
-    [['table', 0.6, 1.8], ['toast', 2.6, 1.9], [null, 4.5]],
-  ],
-  expenses: [
-    [['dropzone', 0.4, 1.6], ['form', 3.2, 1.5], ['toast', 4.2, 1.9], [null, 6]],
-    [['form', 0.2, 1.5], ['save', 2.3, 2], ['toast', 3.9, 1.9], [null, 5.8]],
-    [['vat', 0.3, 1.4], [null, 4]],
-  ],
-  bank: [
-    [['dialog', 0.4, 1.6], ['table', 3.3, 1.4], ['toast', 4.4, 1.9], [null, 6]],
-    [['table', 0.3, 1.6], [null, 4]],
-    [['dialog', 0.6, 1.7], ['save', 2.6, 2], ['table', 4.2, 1.5], [null, 6]],
-  ],
-  vat: [
-    [['vat', 0.3, 1.4], [null, 3.5]],
-    [['due', 0.5, 2], [null, 4.5]],
-    [['export', 0.4, 2], ['toast', 2, 1.9], [null, 4.5]],
-  ],
-  reports: [
-    [['stats', 0.3, 1.5], [null, 3.5]],
-    [['table', 0.3, 1.4], ['result', 2.6, 2], [null, 4.5]],
-    [['export', 0.4, 2], ['toast', 2, 1.9], [null, 4.5]],
-  ],
-  dashboard: [
-    [['stats', 0.2, 1.5], [null, 3]],
-    [['chart', 0.3, 1.4], [null, 4.2]],
-    [['table', 0.3, 1.5], ['toast', 1.9, 1.9], [null, 4.5]],
-  ],
-  notes: [
-    [['form', 0.3, 1.6], [null, 3.5]],
-    [['note', 0.3, 1.8], [null, 5]],
-    [['table', 0.3, 1.6], [null, 3.5]],
-  ],
-  google: MAIL_CAMERAS,
-  microsoft: MAIL_CAMERAS,
-  whatsapp: [
-    [['chat', 0.2, 1.3], [null, 5]],
-    [['chat', 0.2, 1.3], [null, 4.5]],
-    [['table', 0.3, 1.6], [null, 3.5]],
-  ],
-  ai: [
-    [['mails', 0.2, 1.5], ['convert', 1.2, 2], [null, 3.6]],
-    [['form', 0.2, 1.4], [null, 4]],
-    [['dropzone', 0.3, 1.6], ['form', 2.5, 1.5], ['toast', 3, 1.9], [null, 5]],
-  ],
-  mollie: [
-    [['dialog', 0.5, 1.7], ['install', 1.8, 2], ['plugin', 3.3, 1.8], [null, 5]],
-    [['pay', 0.4, 2], [null, 3]],
-    [['table', 0.6, 1.7], ['toast', 1.4, 1.9], [null, 4]],
-  ],
-  'bank-connection': [
-    [['dialog', 0.4, 1.7], ['link', 2, 2], [null, 4.5]],
-    [['consent', 0.6, 1.9], [null, 3.5]],
-    [['table', 0.3, 1.4], ['toast', 1.8, 1.9], [null, 4.5]],
-  ],
+  products: [[], [['suggest', 1.1, 1.4], [null, 4.8]], []],
+  expenses: [[['form', 0.4, 1.25], [null, 5.2]], [], []],
+  bank: [[], [['table', 0.3, 1.25], [null, 4.6]], []],
+  vat: [[], [['due', 0.4, 1.4], [null, 4.6]], []],
+  reports: [[], [['table', 0.3, 1.25], [null, 4.6]], []],
+  dashboard: [[], [['chart', 0.4, 1.25], [null, 4.6]], []],
+  notes: [[], [['note', 0.3, 1.35], [null, 5]], []],
 };
 
 /** Een prijs die van 42 naar 44 gaat */
@@ -1372,16 +1312,20 @@ export default function ModuleDemo({ module }: { module: SiteModule }) {
     setReduced(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }, []);
 
-  // De tijd per stap: elke 50 ms een tik, bij een nieuwe stap weer vanaf nul
+  // De tijd per stap, bij een nieuwe stap weer vanaf nul
   useEffect(() => {
     if (reduced) {
       setT(99);
       return;
     }
+    // Mee met de verversing van het scherm, zodat typen en tellen vloeiend lopen
     const started = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      setT((now - started) / 1000);
+      frame = requestAnimationFrame(tick);
+    });
     setT(0);
-    const timer = setInterval(() => setT((performance.now() - started) / 1000), 50);
-    return () => clearInterval(timer);
+    return () => cancelAnimationFrame(frame);
   }, [active, reduced]);
 
   // Na de tijd van een stap door naar de volgende

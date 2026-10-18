@@ -105,28 +105,6 @@
 .site .whatsapp p {max-width: 85%; margin: 0 0 6px 0; padding: 6px var(--space10); border-radius: var(--border-radius2); background: var(--color2);}
 .site .whatsapp p.own {margin-left: auto; background: #d9fdd3;}
 
-@media (max-width: 1000px) {
-  .site .site-nav {display: none;}
-  .site .site-header .site-container {justify-content: space-between;}
-  .site .site-grid {grid-template-columns: repeat(2, minmax(0, 1fr));}
-  .site .site-feature, .site .site-feature.reverse, .site .site-split, .site .site-price {grid-template-columns: minmax(0, 1fr); gap: var(--space40);}
-  .site .site-feature.reverse .site-feature-text {order: 0;}
-  .site .site-price-head {border-right: 0; border-bottom: 1px solid var(--border-color);}
-  .site .site-footer > .site-container:first-child {flex-direction: column;}
-}
-
-@media (max-width: 640px) {
-  .site .site-hero {padding-top: var(--space50);}
-  .site .site-lead {font-size: 17px;}
-  .site .site-grid, .site .site-price ul {grid-template-columns: minmax(0, 1fr);}
-  .site .site-actions .button.tertiary {display: none;}
-  .site .site-feature.reverse .screenshot {width: 100%;}
-  .site .whatsapp {position: static; width: auto; margin: var(--space20) 0 0 0;}
-  .site .site-price ul, .site .site-price-head {padding: var(--space30);}
-  .site .site-footer-links {flex-wrap: wrap; gap: var(--space30);}
-  .site .form-section .form-row {flex-direction: column;}
-}
-
 /* Modules: per groep een kopje boven het raster; een blok is een link naar
    de detailpagina, met de kop en een kaart met feitjes ernaast */
 .site .site-group {margin: 0 0 var(--space50) 0;}
@@ -147,10 +125,6 @@
 .site .site-facts dt {color: var(--font-color2);}
 .site .site-facts dd {margin: 0;}
 
-@media (max-width: 1000px) {
-  .site .site-grid.three {grid-template-columns: minmax(0, 1fr);}
-}
-
 /* Het demoblok op de pagina van een module: links de stappen met een
    voortgangsbalk, rechts een nagebouwd scherm uit de app dat per stap laat
    zien wat er gebeurt */
@@ -170,7 +144,7 @@
 .site .site-window-screen {position: relative; height: 460px; overflow: hidden; background: var(--color3);}
 /* Eerst passend verkleind, daarbinnen de camera die in- en uitzoomt */
 .site .site-window-fit {width: 1000px; height: 766px; transform-origin: 0 0;}
-.site .site-camera {position: relative; width: 1000px; height: 766px; overflow: hidden; transform-origin: 0 0; transition: transform 1.1s cubic-bezier(.65, 0, .35, 1); will-change: transform;}
+.site .site-camera {position: relative; width: 1000px; height: 766px; overflow: hidden; transform-origin: 0 0; transition: transform 1.6s cubic-bezier(.45, 0, .2, 1); will-change: transform;}
 
 /* De verkleinde app: de echte classes uit globals.css, met de maten van de
    app in plaats van die van de website, en wat vast aan het scherm staat
@@ -181,6 +155,8 @@
 .site .site-app .sidebar .navigation > span {display: flex; align-items: center; gap: var(--space10); padding: var(--space5) var(--space10); color: var(--font-color2); font-size: 13px; border-radius: var(--border-radius1);}
 .site .site-app .sidebar .navigation > span.active {background-color: #efefef; color: var(--font-color1);}
 .site .site-app .content {overflow: visible;}
+/* De app in de demo heeft altijd dezelfde breedte; de responsive regels van de app gelden hier niet */
+.site .site-app .grid.four {grid-template-columns: repeat(4, minmax(0, 1fr));}
 .site .site-app h1 {font-size: var(--h1-size); letter-spacing: normal; line-height: 1.35em;}
 .site .site-app h2 {font-size: var(--h2-size); letter-spacing: normal; line-height: 1.35em;}
 .site .site-app h3 {font-size: var(--h3-size); letter-spacing: normal;}
@@ -260,14 +236,37 @@
 @keyframes site-fade-in {from {opacity: 0;} to {opacity: 1;}}
 @keyframes site-blink {50% {opacity: 0;}}
 
-/* Wie minder beweging wil, ziet meteen het eindbeeld van elke stap */
+/* Responsive en minder beweging: altijd onderaan, per breedte één blok */
+@media (max-width: 1000px) {
+  .site .site-nav {display: none;}
+  .site .site-header .site-container {justify-content: space-between;}
+  .site .site-grid {grid-template-columns: repeat(2, minmax(0, 1fr));}
+  .site .site-feature, .site .site-feature.reverse, .site .site-split, .site .site-price {grid-template-columns: minmax(0, 1fr); gap: var(--space40);}
+  .site .site-feature.reverse .site-feature-text {order: 0;}
+  .site .site-price-head {border-right: 0; border-bottom: 1px solid var(--border-color);}
+  .site .site-footer > .site-container:first-child {flex-direction: column;}
+
+  .site .site-grid.three {grid-template-columns: minmax(0, 1fr);}
+
+  .site .site-demo {grid-template-columns: minmax(0, 1fr); gap: var(--space40);}
+}
+
+@media (max-width: 640px) {
+  .site .site-hero {padding-top: var(--space50);}
+  .site .site-lead {font-size: 17px;}
+  .site .site-grid, .site .site-price ul {grid-template-columns: minmax(0, 1fr);}
+  .site .site-actions .button.tertiary {display: none;}
+  .site .site-feature.reverse .screenshot {width: 100%;}
+  .site .whatsapp {position: static; width: auto; margin: var(--space20) 0 0 0;}
+  .site .site-price ul, .site .site-price-head {padding: var(--space30);}
+  .site .site-footer-links {flex-wrap: wrap; gap: var(--space30);}
+  .site .site-card .form-section .form-row {flex-direction: column;}
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* Wie minder beweging wil, ziet meteen het eindbeeld van elke stap */
   .site .site-appear, .site .site-cursor {animation: none;}
   .site .site-cursor {display: none;}
   .site .site-camera {transition: none;}
   .site .site-demo-progress span {animation: none; width: 100%;}
-}
-
-@media (max-width: 1000px) {
-  .site .site-demo {grid-template-columns: minmax(0, 1fr); gap: var(--space40);}
 }

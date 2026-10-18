@@ -571,7 +571,26 @@ export async function getProject(id: string | number, tenantId: string) {
 /** De velden van een project die iemand zelf invult */
 type ProjectInput = Pick<Project, 'name' | 'customer_id' | 'status' | 'address' | 'start_date' | 'end_date' | 'description'>;
 
+/**
+ * Een klant of project waar iets naar verwijst, moet van hetzelfde bedrijf
+ * zijn. De app werkt met de service role, dus de database houdt dat niet
+ * tegen; zonder deze controle kan een id van een ander bedrijf ingevuld
+ * worden, en komen diens gegevens via de koppeling mee terug.
+ */
+async function checkReferences(tenantId: string, refs: { customer_id?: unknown; project_id?: unknown }) {
+  const checks = [
+    { id: refs.customer_id, table: 'customers', problem: 'Deze klant bestaat niet' },
+    { id: refs.project_id, table: 'projects', problem: 'Dit project bestaat niet' },
+  ];
+  for (const { id, table, problem } of checks) {
+    if (id === undefined || id === null || id === '') continue;
+    const { data, error } = await supabase.from(table).select('id').eq('id', id).eq('tenant_id', tenantId).maybeSingle();
+    if (error || !data) throw new Error(problem);
+  }
+}
+
 export async function createProject(tenantId: string, fields: ProjectInput) {
+  await checkReferences(tenantId, fields);
   const { data, error } = await supabase
     .from('projects')
     .insert({ ...fields, tenant_id: tenantId, updated_at: now() })
@@ -583,6 +602,7 @@ export async function createProject(tenantId: string, fields: ProjectInput) {
 }
 
 export async function updateProject(id: string | number, tenantId: string, fields: Partial<ProjectInput>) {
+  await checkReferences(tenantId, fields);
   const { data, error } = await supabase
     .from('projects')
     .update({ ...fields, updated_at: now() })
@@ -912,6 +932,7 @@ export async function createQuote(
   quote: Omit<Quote, 'id' | 'created_at' | 'updated_at'>,
   blocks: DocumentBlock[]
 ) {
+  await checkReferences(quote.tenant_id, quote);
   const { data: quoteData, error: quoteError } = await supabase
     .from('quotes')
     .insert({ ...quote, updated_at: now() })
@@ -931,6 +952,7 @@ export async function updateQuote(
   updates: Partial<Quote>,
   blocks?: DocumentBlock[]
 ) {
+  await checkReferences(tenantId, updates);
   const { data, error } = await supabase
     .from('quotes')
     .update({ ...updates, updated_at: now() })
@@ -1161,6 +1183,7 @@ export async function createInvoice(
 ) {
   // Een nieuwe factuur is een concept zonder nummer; dat komt pas bij het
   // vastleggen (zie assignInvoiceNumber)
+  await checkReferences(invoice.tenant_id, invoice);
   const { invoice_number, ...invoiceWithoutNumber } = invoice as any;
 
   const { data: invoiceData, error: invoiceError } = await supabase
@@ -1199,6 +1222,7 @@ export async function updateInvoice(
   updates: Partial<Invoice>,
   blocks?: DocumentBlock[]
 ) {
+  await checkReferences(tenantId, updates);
   // De betaaldatum volgt de status: op Betaald wordt het vandaag (of blijft
   // de datum van eerder), terug naar iets anders wist hem weer. Zo klopt de
   // omzet, hoe de factuur ook op Betaald komt
@@ -1606,6 +1630,7 @@ type ExpenseInput = Pick<Expense, 'supplier' | 'reference' | 'expense_date' | 'd
  * er is. De bedragen komen uit de regels, zodat ze altijd kloppen.
  */
 export async function createExpense(tenantId: string, fields: ExpenseInput, lines: ExpenseLine[], file?: IncomingFile | null) {
+  await checkReferences(tenantId, fields);
   const stored = file ? await uploadDocument(tenantId, 'expenses', file) : null;
 
   const { data, error } = await supabase
@@ -1642,6 +1667,7 @@ export async function updateExpense(
   lines?: ExpenseLine[],
   file?: IncomingFile | null
 ) {
+  await checkReferences(tenantId, fields);
   const current = await getExpense(id, tenantId);
   const updates: Record<string, unknown> = { ...fields, updated_at: now() };
 
@@ -1722,6 +1748,7 @@ export async function getNote(id: string | number, tenantId: string) {
 }
 
 export async function createNote(note: Omit<Note, 'id' | 'created_at' | 'updated_at'>) {
+  await checkReferences(note.tenant_id, note);
   const { data, error } = await supabase
     .from('notes')
     .insert({ ...note, updated_at: now() })
@@ -1733,6 +1760,7 @@ export async function createNote(note: Omit<Note, 'id' | 'created_at' | 'updated
 }
 
 export async function updateNote(id: string | number, tenantId: string, updates: Partial<Note>) {
+  await checkReferences(tenantId, updates);
   const { data, error } = await supabase
     .from('notes')
     .update({ ...updates, updated_at: now() })

@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { TOO_MANY_ATTEMPTS, TWO_FACTOR_INVALID, TWO_FACTOR_REQUIRED, pageTitle } from '@/lib/constants';
 import { useToast } from '@/components/Toast';
 import PasswordInput from '@/components/PasswordInput';
+import { LoaderCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -96,7 +97,7 @@ export default function Login() {
                 placeholder="Vul de code in"
               />
               <button className="button" type="submit" disabled={isLoading}>
-                {isLoading ? 'Bezig met controleren...' : 'Bevestigen'}
+                {isLoading ? <><LoaderCircle size={14} className="spinner" />Bezig met controleren...</> : 'Bevestigen'}
               </button>
               <button
                 type="button"
@@ -128,7 +129,7 @@ export default function Login() {
               placeholder="Vul je wachtwoord in"
             />
             <button className="button" type="submit" disabled={isLoading}>
-              {isLoading ? 'Bezig met inloggen...' : 'Login'}
+              {isLoading ? <><LoaderCircle size={14} className="spinner" />Bezig met inloggen...</> : 'Login'}
             </button>
             <Link href="/forgot-password" className="back">
               Wachtwoord vergeten?

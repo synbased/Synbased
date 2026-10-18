@@ -89,6 +89,10 @@ button {font-family: var(--font-family1); font-size: var(--fontsize2); backgroun
 .button.icon {display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; background: var(--color2); border: 1px solid var(--border-color); color: var(--font-color1);}
 .button.icon:hover:not(:disabled) {background: var(--color4);}
 .button.icon:disabled {color: var(--font-color2); opacity: .5; cursor: default;}
+.button:disabled {opacity: .6; cursor: default;}
+/* Een draaiend icoon voor de tekst zolang een knop bezig is, zoals "Bezig met inloggen..." */
+.button .spinner {display: inline-block; vertical-align: middle; margin: -2px var(--space5) 0 0; animation: spin .8s linear infinite;}
+@keyframes spin {to {transform: rotate(360deg);}}
 
 .checkbox {width: 16px; height: 16px; background: unset; padding: 0; border: 1px solid var(--border-color); border-radius: 4px; box-shadow: 0px 1px 2px rgba(0, 0, 0, 0.05);}
 .checkbox[aria-checked="true"] {background: var(--color5); border-color: var(--color5); color: var(--color2);}

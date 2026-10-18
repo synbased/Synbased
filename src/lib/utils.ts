@@ -31,8 +31,16 @@ export function getCustomerOptionLabel(customer: Partial<NameParts> & { customer
 /** Het bedrag van één regel. Een tussenkop telt niet mee. */
 export function lineTotal(item: Pick<LineItem, 'quantity' | 'price' | 'is_heading'>): number {
   if (item.is_heading) return 0;
-  return (Number(item.quantity) || 0) * (Number(item.price) || 0);
+  return roundQuantity(item.quantity) * roundPrice(item.price);
 }
+
+/**
+ * Zo nauwkeurig als de database ze bewaart: een aantal op drie decimalen
+ * (7,125 m²), een prijs op centen. Gerekend wordt met dezelfde getallen,
+ * zodat het totaal op het scherm en dat uit de opgeslagen regels gelijk zijn.
+ */
+export const roundQuantity = (quantity: unknown) => Math.round((Number(quantity) || 0) * 1000) / 1000;
+export const roundPrice = (price: unknown) => Math.round((Number(price) || 0) * 100) / 100;
 
 /**
  * Bereken de bedragen van één prijstabel. Elke tabel heeft een eigen

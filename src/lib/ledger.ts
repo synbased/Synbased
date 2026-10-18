@@ -99,7 +99,21 @@ function post(lines: JournalLine[], date: string, source: string, description: s
  */
 export async function buildJournal(tenantId: string, to: string): Promise<JournalLine[]> {
   const lines: JournalLine[] = [];
-  const { invoices, expenses } = await getVatOverview(tenantId, '1900-01-01', to);
+  const [{ invoices, expenses }, { data: accounts }, { data: transactions }] = await Promise.all([
+    getVatOverview(tenantId, '1900-01-01', to),
+    supabaseAdmin.from('bank_accounts').select('iban, opening_balance, opening_date').eq('tenant_id', tenantId),
+    supabaseAdmin
+      .from('bank_transactions')
+      .select('booked_on, amount, counterparty_name, description, category, invoice_id, expense_id')
+      .eq('tenant_id', tenantId)
+      .lte('booked_on', to),
+  ]);
+
+  // Betaald via de bank: dan boekt de transactie zelf, met het bedrag dat er
+  // echt binnenkwam of afging. Zo klopt de bank met het afschrift, ook bij een
+  // deelbetaling; wat nog openstaat blijft bij debiteuren of crediteuren
+  const paidByBank = (key: 'invoice_id' | 'expense_id', id: number) =>
+    (transactions || []).some((transaction: any) => transaction[key] === id);
 
   for (const invoice of invoices) {
     const source = `${invoice.credit_for_invoice_id ? 'Creditfactuur' : 'Factuur'} ${invoice.invoice_number || ''}`.trim();
@@ -109,7 +123,7 @@ export async function buildJournal(tenantId: string, to: string): Promise<Journa
     }
 
     const paidOn = invoice.status === 'paid' && invoice.paid_at ? invoice.paid_at.slice(0, 10) : null;
-    if (paidOn && paidOn <= to) {
+    if (paidOn && paidOn <= to && !paidByBank('invoice_id', invoice.id)) {
       const total = cents(invoice.base + invoice.vat);
       post(lines, paidOn, source, invoice.mollie_payment_id ? 'Betaald via Mollie' : 'Betaald', invoice.mollie_payment_id ? '2200' : '1000', '1300', total);
     }
@@ -130,17 +144,8 @@ export async function buildJournal(tenantId: string, to: string): Promise<Journa
     }
 
     const paidOn = expense.status === 'paid' && expense.paid_at ? expense.paid_at.slice(0, 10) : null;
-    if (paidOn && paidOn <= to) post(lines, paidOn, source, 'Betaald', '1600', '1000', expense.total);
+    if (paidOn && paidOn <= to && !paidByBank('expense_id', expense.id)) post(lines, paidOn, source, 'Betaald', '1600', '1000', expense.total);
   }
-
-  const [{ data: accounts }, { data: transactions }] = await Promise.all([
-    supabaseAdmin.from('bank_accounts').select('iban, opening_balance, opening_date').eq('tenant_id', tenantId),
-    supabaseAdmin
-      .from('bank_transactions')
-      .select('booked_on, amount, counterparty_name, description, category, invoice_id, expense_id')
-      .eq('tenant_id', tenantId)
-      .lte('booked_on', to),
-  ]);
 
   for (const account of accounts || []) {
     if (account.opening_balance === null || !account.opening_date || account.opening_date > to) continue;
@@ -148,9 +153,12 @@ export async function buildJournal(tenantId: string, to: string): Promise<Journa
   }
 
   for (const transaction of transactions || []) {
-    // Gekoppeld aan een factuur of kostenpost: de betaling daarvan boekt al
-    if (transaction.invoice_id || transaction.expense_id) continue;
-    const counter = transaction.category ? bankCategoryAccount(transaction.category) : '2300';
+    // Gekoppeld aan een factuur of kostenpost: tegen debiteuren of crediteuren
+    const counter = transaction.invoice_id
+      ? '1300'
+      : transaction.expense_id
+        ? '1600'
+        : transaction.category ? bankCategoryAccount(transaction.category) : '2300';
     const description = transaction.description || transaction.counterparty_name || 'Banktransactie';
     post(lines, transaction.booked_on, `Bank ${transaction.counterparty_name || ''}`.trim(), description, '1000', counter, Number(transaction.amount));
   }

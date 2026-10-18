@@ -27,6 +27,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
+      // Getekend door de klant is een afspraak: de inhoud ligt vast. Alleen het
+      // project kan nog, voor het termijnschema
+      const current = await getQuote(id, tenantId);
+      if (current.signed_at && Object.keys(req.body || {}).some(key => key !== 'project_id')) {
+        return res.status(409).json({ error: 'Deze offerte is getekend door de klant en verandert niet meer. Maak een nieuwe offerte voor een wijziging.' });
+      }
+
       const {
         customer_id,
         quote_number,

@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { updateInvoice } from '@/lib/db';
+import { releaseSettlement } from '@/lib/bank';
 
 /**
  * Een factuur als betaald markeren, of dat terugdraaien: POST { paid }.
@@ -23,6 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ooit als betaald stond, ligt vast (zie lib/invoices)
     const status = req.body?.paid === false ? 'sent' : 'paid';
     const updated = await updateInvoice(id, tenantId, { status });
+    if (status === 'sent') await releaseSettlement(tenantId, id);
     return res.status(200).json(updated);
   } catch (error: any) {
     console.error('Mark paid error:', error);

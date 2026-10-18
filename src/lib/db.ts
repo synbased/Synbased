@@ -1,7 +1,7 @@
 import { supabaseAdmin } from './supabase';
-import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Project, ProjectInstallment, Quote, Tenant, Note, Product } from './supabase';
+import type { Customer, DocumentBlock, DocumentElement, Expense, ExpenseLine, Invoice, Project, ProjectInstallment, Quote, Tenant, Note, Product } from './supabase';
 import type { PurchaseVatType, SalesVatType } from './constants';
-import { calculateDocumentTotal, calculateElementTotals, lineTotal } from './utils';
+import { calculateDocumentTotal, calculateElementTotals, formatCurrency, lineTotal, roundPrice, roundQuantity } from './utils';
 import { copyBlocks } from './blocks';
 import { isCreditNote, isFinalInvoice } from './invoices';
 import { isCountable, nextNumber } from './numbering';
@@ -133,9 +133,9 @@ async function saveBlocks(
         tenant_id: tenantId,
         description: (item.description || '').trim(),
         is_heading: !!item.is_heading,
-        quantity: item.is_heading ? 0 : Number(item.quantity) || 0,
+        quantity: item.is_heading ? 0 : roundQuantity(item.quantity),
         unit: item.is_heading ? null : item.unit || null,
-        price: item.is_heading ? 0 : Number(item.price) || 0,
+        price: item.is_heading ? 0 : roundPrice(item.price),
         total: lineTotal(item),
         position: itemIndex,
       }));
@@ -577,7 +577,7 @@ type ProjectInput = Pick<Project, 'name' | 'customer_id' | 'status' | 'address' 
  * tegen; zonder deze controle kan een id van een ander bedrijf ingevuld
  * worden, en komen diens gegevens via de koppeling mee terug.
  */
-async function checkReferences(tenantId: string, refs: { customer_id?: unknown; project_id?: unknown }) {
+export async function checkReferences(tenantId: string, refs: { customer_id?: unknown; project_id?: unknown }) {
   const checks = [
     { id: refs.customer_id, table: 'customers', problem: 'Deze klant bestaat niet' },
     { id: refs.project_id, table: 'projects', problem: 'Dit project bestaat niet' },
@@ -628,7 +628,24 @@ export async function deleteProject(id: string | number, tenantId: string) {
  * project telt wat er zonder btw overblijft.
  */
 async function documentBases(soort: Soort, ids: number[], tenantId: string): Promise<Map<number, number>> {
-  const bases = new Map<number, number>();
+  return sumPriceTables(soort, ids, tenantId, (parentId) => parentId);
+}
+
+/** Het btw-tarief en de soort btw van een prijstabel, als sleutel */
+const rateKey = (element: { tax_percentage: number; vat_type?: string | null }) =>
+  `${Number(element.tax_percentage)}|${element.vat_type || 'normal'}`;
+
+/**
+ * Het bedrag exclusief btw van de prijstabellen, opgeteld per sleutel: per
+ * document, of per btw-tarief over alle documenten samen.
+ */
+async function sumPriceTables<K>(
+  soort: Soort,
+  ids: number[],
+  tenantId: string,
+  keyFor: (parentId: number, element: any) => K
+): Promise<Map<K, number>> {
+  const bases = new Map<K, number>();
   if (ids.length === 0) return bases;
 
   const { blocksTable, elementsTable, itemsTable, parentKey } = tablesFor(soort);
@@ -643,7 +660,8 @@ async function documentBases(soort: Soort, ids: number[], tenantId: string): Pro
     for (const element of block.elements || []) {
       if (element.kind !== 'prijstabel') continue;
       const totals = calculateElementTotals(element);
-      bases.set(block[parentKey], cents((bases.get(block[parentKey]) || 0) + totals.subtotal - totals.discount));
+      const key = keyFor(block[parentKey], element);
+      bases.set(key, cents((bases.get(key) || 0) + totals.subtotal - totals.discount));
     }
   }
   return bases;
@@ -677,14 +695,6 @@ export async function getProjectOverview(id: string | number, tenantId: string) 
   const invoiced = cents(finalInvoices.reduce((sum, i) => sum + i.base, 0));
   const costs = cents((expenses.data || []).reduce((sum: number, e: any) => sum + (Number(e.total_excl) || 0), 0));
 
-  // Per goedgekeurde offerte: hoeveel er al gefactureerd is, ook concepten meegeteld
-  const progress = quoteRows
-    .filter(q => q.status === 'approved' && q.base > 0)
-    .map(q => {
-      const billed = invoiceRows.filter(i => i.quote_id === q.id && i.status !== 'cancelled').reduce((sum, i) => sum + i.base, 0);
-      return { quote_id: q.id, quote_number: q.quote_number, base: q.base, billed: cents(billed), percentage: Math.round((billed / q.base) * 100) };
-    });
-
   // Het termijnschema, met per termijn de status van zijn factuur
   const { data: installments, error: installmentsError } = await supabase
     .from('project_installments')
@@ -694,13 +704,35 @@ export async function getProjectOverview(id: string | number, tenantId: string) 
     .order('position');
   if (installmentsError) throw installmentsError;
 
+  // Per goedgekeurde offerte: hoeveel er al gefactureerd is, ook concepten
+  // meegeteld. Een termijnfactuur telt met het percentage van zijn termijn,
+  // een andere factuur met zijn deel van het bedrag
+  const scheduledPercentage = new Map<number, number>(
+    (installments || []).filter((row: any) => row.invoice_id).map((row: any) => [row.invoice_id, Number(row.percentage)])
+  );
+  const progress = quoteRows
+    .filter(q => q.status === 'approved' && q.base > 0)
+    .map(q => {
+      const billedInvoices = invoiceRows.filter(i => i.quote_id === q.id && i.status !== 'cancelled');
+      const billed = billedInvoices.reduce((sum, i) => sum + i.base, 0);
+      const percentage = billedInvoices.reduce((sum, i) => sum + (scheduledPercentage.get(i.id) ?? (i.base / q.base) * 100), 0);
+      return { quote_id: q.id, quote_number: q.quote_number, base: q.base, billed: cents(billed), percentage: Math.round(percentage * 100) / 100 };
+    });
+
   const scheduleQuote = quoteRows.find(q => q.id === installments?.[0]?.quote_id) || null;
-  const schedule = (installments || []).map((row: any) => {
+  // Komt het schema op 100%, dan krijgt de laatste termijn de rest, net als zijn factuur
+  const rows = installments || [];
+  const fullSchedule = Math.abs(rows.reduce((sum: number, row: any) => sum + Number(row.percentage), 0) - 100) < 0.001;
+  let scheduled = 0;
+  const schedule = rows.map((row: any, index: number) => {
     const invoice = invoiceRows.find(i => i.id === row.invoice_id);
+    const share = scheduleQuote ? cents((scheduleQuote.base * Number(row.percentage)) / 100) : 0;
+    const amount = scheduleQuote && fullSchedule && index === rows.length - 1 ? cents(scheduleQuote.base - scheduled) : share;
+    scheduled += share;
     return {
       ...row,
       percentage: Number(row.percentage),
-      amount: scheduleQuote ? cents((scheduleQuote.base * Number(row.percentage)) / 100) : 0,
+      amount,
       invoice: invoice ? { id: invoice.id, invoice_number: invoice.invoice_number, status: invoice.status } : null,
     };
   });
@@ -736,19 +768,44 @@ export async function createInstallmentInvoice(
   if (quote.project_id !== project.id) throw new Error('Deze offerte hoort niet bij dit project');
   if (quote.status !== 'approved') throw new Error('Deze offerte is nog niet goedgekeurd door de klant');
 
-  const { progress } = await getProjectOverview(projectId, tenantId);
-  const current = progress.find(p => p.quote_id === quote.id);
-  if (current && current.percentage + percentage > 100) {
-    throw new Error(`Er is al ${current.percentage}% van deze offerte gefactureerd; er kan nog ${100 - current.percentage}% bij`);
+  // Per btw-tarief één regel; tabellen met hetzelfde tarief tellen samen
+  const groups = new Map<string, { element: DocumentElement; base: number }>();
+  for (const block of quote.blocks as DocumentBlock[]) {
+    for (const element of block.elements) {
+      if (element.kind !== 'prijstabel') continue;
+      const totals = calculateElementTotals(element);
+      const group = groups.get(rateKey(element)) || { element, base: 0 };
+      groups.set(rateKey(element), { ...group, base: group.base + totals.subtotal - totals.discount });
+    }
   }
 
-  const tables = (quote.blocks as DocumentBlock[]).flatMap(block => block.elements.filter(element => element.kind === 'prijstabel'));
-  const elements = tables
-    .map((element) => {
-      const totals = calculateElementTotals(element);
-      const base = totals.subtotal - totals.discount;
-      // Bij meer tabellen staat erbij welk tarief, zodat je ze uit elkaar houdt
-      const suffix = tables.length > 1
+  // Hoeveel procent er al gefactureerd is, zie getProjectOverview
+  const { invoices, progress } = await getProjectOverview(projectId, tenantId);
+  const quoteInvoices = invoices.filter((invoice: any) => invoice.quote_id === quote.id && invoice.status !== 'cancelled');
+  const billedPercentage = progress.find(p => p.quote_id === quote.id)?.percentage || 0;
+
+  const left = Math.round((100 - billedPercentage) * 100) / 100;
+  if (percentage > left + 0.001) {
+    throw new Error(left <= 0 ? `Deze offerte is al helemaal gefactureerd` : `Er is al ${billedPercentage}% van deze offerte gefactureerd; er kan nog ${left}% bij`);
+  }
+
+  // Elke termijn brengt het gefactureerde per tarief op zijn deel van de
+  // offerte tot en met deze termijn. Zo stapelen afrondingen niet op, en komt
+  // de laatste termijn precies op de offerte uit
+  const billedByRate = await sumPriceTables(
+    'invoice',
+    quoteInvoices.map((invoice: any) => invoice.id),
+    tenantId,
+    (_parentId, element) => rateKey(element)
+  );
+  const upTo = billedPercentage + percentage;
+
+  const elements = [...groups.entries()]
+    .map(([key, { element, base }]) => {
+      const target = upTo >= 100 - 0.001 ? cents(base) : cents((base * upTo) / 100);
+      const price = cents(target - (billedByRate.get(key) || 0));
+      // Bij meer tarieven staat erbij welk, zodat je ze uit elkaar houdt
+      const suffix = groups.size > 1
         ? ` (${element.vat_type && element.vat_type !== 'normal' ? 'btw verlegd/buitenland' : `${element.tax_percentage}% btw`})`
         : '';
       return {
@@ -763,7 +820,7 @@ export async function createInstallmentInvoice(
           is_heading: false,
           quantity: 1,
           unit: null,
-          price: cents((base * percentage) / 100),
+          price,
         }],
       };
     })
@@ -1216,6 +1273,49 @@ async function checkVatNumber(id: string | number, tenantId: string) {
   }
 }
 
+/**
+ * Wat er van een factuur nog gecrediteerd kan worden: het bedrag min de
+ * creditfacturen die al vastliggen (behalve except, de creditfactuur zelf).
+ */
+async function creditRoom(invoiceId: number, tenantId: string, except?: number | string) {
+  const [{ data: original, error }, { data: credits, error: creditsError }] = await Promise.all([
+    supabase.from('invoices').select('total').eq('id', invoiceId).eq('tenant_id', tenantId).single(),
+    supabase.from('invoices').select('id, total, status').eq('tenant_id', tenantId).eq('credit_for_invoice_id', invoiceId),
+  ]);
+  if (error) throw error;
+  if (creditsError) throw creditsError;
+
+  const credited = (credits || [])
+    .filter((credit: any) => String(credit.id) !== String(except) && isFinalInvoice(credit) && credit.status !== 'cancelled')
+    .reduce((sum: number, credit: any) => sum + Math.abs(Number(credit.total) || 0), 0);
+  return cents((Number(original.total) || 0) - credited);
+}
+
+/**
+ * Een creditfactuur draait (een deel van) zijn factuur terug: een min-bedrag,
+ * en samen met de eerdere creditfacturen nooit meer dan de factuur zelf. Een
+ * vastliggende creditfactuur verandert niet meer, dus alleen concepten.
+ */
+async function checkCreditNote(id: string | number, tenantId: string, total?: number) {
+  const { data: credit } = await supabase
+    .from('invoices')
+    .select('total, status, credit_for_invoice_id')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (!credit?.credit_for_invoice_id || credit.status !== 'draft') return;
+
+  const amount = Number(total ?? credit.total) || 0;
+  if (amount > 0) throw new Error('Een creditfactuur heeft een min-bedrag');
+
+  const room = await creditRoom(credit.credit_for_invoice_id, tenantId, id);
+  if (-amount > room + 0.005) {
+    throw new Error(room <= 0
+      ? 'Deze factuur is al helemaal gecrediteerd'
+      : `Er kan van deze factuur nog ${formatCurrency(room)} gecrediteerd worden; haal regels weg of verlaag de bedragen`);
+  }
+}
+
 export async function updateInvoice(
   id: string | number,
   tenantId: string,
@@ -1238,6 +1338,10 @@ export async function updateInvoice(
     } else {
       updates = { ...updates, paid_at: null };
     }
+  }
+
+  if (updates.total !== undefined || (updates.status !== undefined && updates.status !== 'draft')) {
+    await checkCreditNote(id, tenantId, updates.total);
   }
 
   // Uit concept betekent vastleggen, en een vastliggende factuur heeft een nummer
@@ -1303,6 +1407,19 @@ export async function convertQuoteToInvoice(quoteId: string | number, tenantId: 
     throw new Error('Deze offerte is nog niet goedgekeurd door de klant');
   }
 
+  // Al (deels) gefactureerd met termijnen: dan zou de klant meer dan de offerte betalen
+  const { data: billed, error: billedError } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('quote_id', quote.id)
+    .neq('status', 'cancelled')
+    .limit(1);
+  if (billedError) throw billedError;
+  if (billed?.length) {
+    throw new Error('Van deze offerte zijn al termijnen gefactureerd. Factureer de rest via het termijnschema van het project.');
+  }
+
   // Alle blokken gaan mee, inclusief hun eigen BTW-tarief, zodat de
   // splitsing tussen bijvoorbeeld 9% en 21% op de factuur intact blijft
   const blocks: DocumentBlock[] = copyBlocks(quote.blocks);
@@ -1345,6 +1462,9 @@ export async function createCreditNote(invoiceId: string | number, tenantId: str
   }
   if (isCreditNote(invoice)) {
     throw new Error('Van een creditfactuur kun je geen creditfactuur maken');
+  }
+  if ((await creditRoom(invoice.id, tenantId)) <= 0) {
+    throw new Error('Deze factuur is al helemaal gecrediteerd');
   }
 
   const blocks: DocumentBlock[] = copyBlocks(invoice.blocks).map(block => ({

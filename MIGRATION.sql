@@ -781,6 +781,15 @@ ALTER TABLE project_installments ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS invoice_payment_days INTEGER;
 
+-- ------------------------------------------------------------
+-- 24. Aantallen op drie decimalen
+--
+-- Een aantal als 7,125 m² werd 7,13 bewaard, terwijl het totaal met 7,125
+-- gerekend was. Nu blijft het aantal zoals het ingetypt is.
+-- ------------------------------------------------------------
+ALTER TABLE quote_items ALTER COLUMN quantity TYPE NUMERIC(12,3);
+ALTER TABLE invoice_items ALTER COLUMN quantity TYPE NUMERIC(12,3);
+
 -- De rechten opnieuw, zodat de nieuwe tabellen ze ook hebben
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
@@ -795,7 +804,7 @@ NOTIFY pgrst, 'reload schema';
 -- Controle achteraf
 --
 -- Eén opdracht, want de SQL-editor toont alleen de uitkomst van de laatste.
--- Er horen vierentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
+-- Er horen vijfentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
 -- ergens NEE, dan is dat onderdeel niet gelukt.
 -- ------------------------------------------------------------
 SELECT 'Elementtypes offerte' AS controle,
@@ -965,4 +974,11 @@ UNION ALL SELECT 'Termijnschema en betalingstermijn',
          SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'project_installments'
        ) AND EXISTS (
          SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'tenants' AND column_name = 'invoice_payment_days'
-       ) THEN 'ja' ELSE 'NEE - onderdeel 23 niet gelukt' END;
+       ) THEN 'ja' ELSE 'NEE - onderdeel 23 niet gelukt' END
+
+UNION ALL SELECT 'Aantallen op drie decimalen',
+       CASE WHEN (
+         SELECT count(*) FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name IN ('quote_items', 'invoice_items')
+           AND column_name = 'quantity' AND numeric_scale = 3
+       ) = 2 THEN 'ja' ELSE 'NEE - onderdeel 24 niet gelukt' END;

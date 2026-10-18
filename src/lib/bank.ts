@@ -378,6 +378,36 @@ async function autoMatch(tenantId: string, transactions: BankTransaction[]): Pro
 export type TransactionLink = { invoiceId: number } | { expenseId: number } | { category: string } | null;
 
 /**
+ * Of de transacties die aan een factuur of kostenpost hangen, samen met deze,
+ * het hele bedrag betalen. Een deelbetaling zet hem nog niet op betaald; de
+ * laatste betaling wel.
+ */
+async function coversTotal(key: 'invoice_id' | 'expense_id', id: number, transaction: BankTransaction, total: number) {
+  const { data: others } = await supabase
+    .from('bank_transactions')
+    .select('amount')
+    .eq('tenant_id', transaction.tenant_id)
+    .eq(key, id)
+    .neq('id', transaction.id);
+  const paid = [...(others || []), transaction].reduce((sum, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
+  return paid >= Math.abs(total) - 0.01;
+}
+
+/**
+ * Een factuur die met de hand weer op niet betaald gaat: de transacties die
+ * hem op betaald zetten, doen dat niet meer. Ze blijven wel gekoppeld, want
+ * het geld is binnengekomen; ontkoppelen zet de factuur dan niet nog eens om.
+ */
+export async function releaseSettlement(tenantId: string, invoiceId: number | string) {
+  const { error } = await supabase
+    .from('bank_transactions')
+    .update({ settled: false })
+    .eq('tenant_id', tenantId)
+    .eq('invoice_id', invoiceId);
+  if (error) throw error;
+}
+
+/**
  * Koppelt een transactie aan een factuur, een kostenpost of een categorie.
  *
  * Een factuur of kostenpost die nog openstond gaat op betaald, op de datum
@@ -412,28 +442,28 @@ export async function linkTransaction(tenantId: string, transactionId: number | 
   if (link && 'invoiceId' in link) {
     const { data: invoice } = await supabase
       .from('invoices')
-      .select('id, status')
+      .select('id, status, total')
       .eq('id', link.invoiceId)
       .eq('tenant_id', tenantId)
       .single();
     if (!invoice) throw new Error('Factuur niet gevonden');
 
     update.invoice_id = invoice.id;
-    if (invoice.status === 'sent') {
+    if (invoice.status === 'sent' && (await coversTotal('invoice_id', invoice.id, transaction, Number(invoice.total)))) {
       await updateInvoice(invoice.id, tenantId, { status: 'paid', paid_at: transaction.booked_on });
       update.settled = true;
     }
   } else if (link && 'expenseId' in link) {
     const { data: expense } = await supabase
       .from('expenses')
-      .select('id, status')
+      .select('id, status, total')
       .eq('id', link.expenseId)
       .eq('tenant_id', tenantId)
       .single();
     if (!expense) throw new Error('Kostenpost niet gevonden');
 
     update.expense_id = expense.id;
-    if (expense.status === 'open') {
+    if (expense.status === 'open' && (await coversTotal('expense_id', expense.id, transaction, Number(expense.total)))) {
       await supabase
         .from('expenses')
         .update({ status: 'paid', paid_at: transaction.booked_on })

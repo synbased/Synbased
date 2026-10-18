@@ -36,6 +36,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!customer_id) {
         return res.status(400).json({ error: 'Selecteer een klant' });
       }
+      // Zonder datum valt een factuur buiten de btw-aangifte en de jaarcijfers
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(invoice_date || ''))) {
+        return res.status(400).json({ error: 'Vul de factuurdatum in' });
+      }
 
       const problem = validateBlocks(blocks);
       if (problem) {

@@ -2,7 +2,7 @@ import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { getQuotes, createQuote, resolveDocumentNumber } from '@/lib/db';
+import { getQuotes, createQuote, resolveDocumentNumber, checkReferences } from '@/lib/db';
 import { calculateDocumentTotal } from '@/lib/utils';
 import { validateBlocks } from '@/lib/blocks';
 
@@ -44,6 +44,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (problem) {
         return res.status(400).json({ error: problem });
       }
+
+      // Eerst de klant en het project, zodat een geweigerde offerte geen nummer kost
+      await checkReferences(tenantId, { customer_id, project_id: projectIdFromBody(project_id) });
 
       // Het nummer komt uit de eigen nummering, tenzij er zelf iets ingetypt is
       const number = await resolveDocumentNumber(tenantId, 'quote', quote_number);

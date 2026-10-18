@@ -119,6 +119,9 @@ export default function EditQuote() {
 
   const selectedCustomer = customers.find(c => String(c.id) === formData.customer_id);
 
+  // Getekend door de klant is een afspraak: wat erin staat verandert niet meer
+  const isSigned = !!signature?.signedAt;
+
   const customerOptions = customers.map(c => ({
     value: String(c.id),
     label: getCustomerOptionLabel(c),
@@ -132,7 +135,8 @@ export default function EditQuote() {
     const response = await fetch(`/api/quotes/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      // Ondertekend ligt de inhoud vast; alleen het project kan nog
+      body: JSON.stringify(isSigned ? { project_id: data.project_id || null } : {
         quote_number: data.quote_number,
         quote_date: data.quote_date,
         valid_until: data.valid_until,
@@ -160,7 +164,7 @@ export default function EditQuote() {
   );
 
   // Cmd+Z en Cmd+Shift+Z draaien de laatste stappen terug
-  const geschiedenis = useHistory(formData, setFormData, { enabled: !isLoadingData });
+  const geschiedenis = useHistory(formData, setFormData, { enabled: !isLoadingData && !isSigned });
 
   const handleSubmit = async () => {
     const problem = validateBlocks(formData.blocks);
@@ -348,9 +352,11 @@ export default function EditQuote() {
         blocks={formData.blocks}
         currency={formData.currency}
         signature={signature}
-        onBlocksChange={(blocks) => setFormData({ ...formData, blocks })}
+        // Zonder onBlocksChange is het document alleen te bekijken
+        onBlocksChange={isSigned ? undefined : (blocks) => setFormData({ ...formData, blocks })}
         dataFields={
           <>
+            {!isSigned && (
             <div className="form-section">
               <div className="form-group">
                 <label>Klant</label>
@@ -362,6 +368,7 @@ export default function EditQuote() {
                 />
               </div>
             </div>
+            )}
             <div className="form-section">
               <div className="form-group">
                 <label>Project</label>
@@ -375,6 +382,8 @@ export default function EditQuote() {
               </div>
             </div>
 
+            {!isSigned && (
+            <>
             <div className="form-section">
               <div className="form-group">
                 <label htmlFor="quote_number">Offertenummer</label>
@@ -429,6 +438,8 @@ export default function EditQuote() {
                 />
               </div>
             </div>
+            </>
+            )}
           </>
         }
       />

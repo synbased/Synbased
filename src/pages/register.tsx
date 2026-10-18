@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { pageTitle } from '@/lib/constants';
+import { MIN_PASSWORD_LENGTH, pageTitle } from '@/lib/constants';
 import { useToast } from '@/components/Toast';
 import PasswordInput from '@/components/PasswordInput';
 
@@ -33,8 +33,8 @@ export default function Register() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      toast.error('Fout', 'Wachtwoord moet minimaal 6 karakters bevatten.');
+    if (formData.password.length < MIN_PASSWORD_LENGTH) {
+      toast.error('Fout', `Wachtwoord moet minimaal ${MIN_PASSWORD_LENGTH} tekens bevatten.`);
       return;
     }
 

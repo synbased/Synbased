@@ -14,7 +14,7 @@ import ExpenseFields, {
   type ExpenseFile,
   type ExpenseFormData,
 } from '@/components/ExpenseFields';
-import { vandaag, readJson } from '@/lib/utils';
+import { vandaag, readJson, formatCurrency } from '@/lib/utils';
 
 export default function NewExpense() {
   const toast = useToast();
@@ -65,7 +65,11 @@ export default function NewExpense() {
         return;
       }
       setFormData((current) => applyReading(current, reading));
-      toast.success('Ingevuld', 'Controleer de gegevens en sla op');
+      if (reading.total_matches === false) {
+        toast.warning('Controleer de bedragen', `De regels komen niet uit op het totaal van de bon (${formatCurrency(reading.total_incl)})`);
+      } else {
+        toast.success('Ingevuld', 'Controleer de gegevens en sla op');
+      }
     } catch (error: any) {
       toast.error('Fout', error.message || 'Het bestand kon niet gelezen worden');
     } finally {

@@ -1,4 +1,4 @@
-import { readJson } from '@/lib/utils';
+import { formatCurrency, readJson } from '@/lib/utils';
 import HelpButton from '@/components/HelpButton';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -89,7 +89,11 @@ export default function EditExpense() {
         return;
       }
       setFormData((current) => (current ? applyReading(current, reading) : current));
-      toast.success('Ingevuld', 'Controleer de gegevens en sla op');
+      if (reading.total_matches === false) {
+        toast.warning('Controleer de bedragen', `De regels komen niet uit op het totaal van de bon (${formatCurrency(reading.total_incl)})`);
+      } else {
+        toast.success('Ingevuld', 'Controleer de gegevens en sla op');
+      }
     } catch (error: any) {
       toast.error('Fout', error.message || 'Het bestand kon niet gelezen worden');
     } finally {

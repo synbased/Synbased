@@ -1,4 +1,5 @@
 import { EXPENSE_CATEGORIES, PURCHASE_VAT_TYPES, VAT_RATES } from './constants';
+import type { ReceiptReading } from './ai/types';
 import type { ExpenseLine } from './supabase';
 
 /**
@@ -18,6 +19,45 @@ const cents = (amount: number) => Math.round(amount * 100) / 100;
 /** De btw bij een bedrag exclusief btw, op centen */
 export function vatFor(amountExcl: number, rate: number): number {
   return cents(((Number(amountExcl) || 0) * (Number(rate) || 0)) / 100);
+}
+
+/**
+ * Rekent een gelezen bon na tegen het totaal dat erop staat. Een AI haalt
+ * soms het subtotaal en het totaal door elkaar, of zet een bedrag inclusief
+ * btw neer als exclusief. Wat zeker te herstellen is, wordt hersteld; blijft
+ * het niet kloppen, dan zegt total_matches dat de gebruiker moet kijken.
+ */
+export function checkReceiptTotal(reading: ReceiptReading): ReceiptReading & { total_matches: boolean } {
+  const total = cents(Number(reading.total_incl) || 0);
+  const lines = reading.lines;
+  const sum = (list: typeof lines) => cents(list.reduce((s, line) => s + line.amount_excl + line.vat_amount, 0));
+  // Per regel kan de afronding een cent schelen
+  const fits = (list: typeof lines) => Math.abs(sum(list) - total) <= 0.02 * Math.max(list.length, 1);
+  const vatFits = (line: (typeof lines)[number], excl = line.amount_excl) =>
+    line.vat_type !== 'normal' || Math.abs(vatFor(excl, line.vat_rate) - line.vat_amount) <= 0.02;
+
+  if (total <= 0 || lines.length === 0 || fits(lines)) return { ...reading, total_matches: true };
+
+  // Het bedrag inclusief btw als exclusief: zonder de btw klopt het tarief wel
+  const corrected = lines.map(line =>
+    !vatFits(line) && vatFits(line, cents(line.amount_excl - line.vat_amount))
+      ? { ...line, amount_excl: cents(line.amount_excl - line.vat_amount) }
+      : line
+  );
+  if (fits(corrected)) return { ...reading, lines: corrected, total_matches: true };
+
+  // Eén regel die niet klopt, of maar één regel: die volgt uit het totaal min de rest
+  const suspect = lines.length === 1 ? [0] : lines.flatMap((line, i) => (vatFits(line) ? [] : [i]));
+  if (suspect.length === 1) {
+    const i = suspect[0];
+    const others = sum(lines.filter((_, j) => j !== i));
+    const excl = cents(total - others - lines[i].vat_amount);
+    if (excl > 0 && (lines.length === 1 || vatFits(lines[i], excl))) {
+      return { ...reading, lines: lines.map((line, j) => (j === i ? { ...line, amount_excl: excl } : line)), total_matches: true };
+    }
+  }
+
+  return { ...reading, total_matches: false };
 }
 
 /** De naam van een categorie, of de code zelf als hij niet (meer) bestaat */

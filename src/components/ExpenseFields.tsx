@@ -397,13 +397,22 @@ export function applyReading(formData: ExpenseFormData, reading: any): ExpenseFo
   const date = (value: unknown) => (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '');
   const lines: ExpenseLineForm[] = (Array.isArray(reading?.lines) ? reading.lines : [])
     .filter((line: any) => Number(line?.amount_excl) || Number(line?.vat_amount))
-    .map((line: any) => ({
-      description: String(line.description || ''),
-      amount_excl: (Number(line.amount_excl) || 0).toFixed(2),
-      vat_rate: (VAT_RATES as readonly number[]).includes(Number(line.vat_rate)) ? String(Number(line.vat_rate)) : '21',
-      vat_amount: (Number(line.vat_amount) || 0).toFixed(2),
-      vat_type: line.vat_type in PURCHASE_VAT_TYPES ? line.vat_type : 'normal',
-    }));
+    .map((line: any) => {
+      const vatType = line.vat_type in PURCHASE_VAT_TYPES ? line.vat_type : 'normal';
+      const known = (VAT_RATES as readonly number[]).includes(Number(line.vat_rate)) ? Number(line.vat_rate) : 21;
+      const amountExcl = Number(line.amount_excl) || 0;
+      // Op een verlegde bon staat geen btw; die geef je zelf aan, dus net als
+      // bij invullen met de hand de btw over het bedrag, standaard 21%
+      const rate = vatType !== 'normal' && known === 0 ? 21 : known;
+      const vatAmount = vatType !== 'normal' ? vatFor(amountExcl, rate) : Number(line.vat_amount) || 0;
+      return {
+        description: String(line.description || ''),
+        amount_excl: amountExcl.toFixed(2),
+        vat_rate: String(rate),
+        vat_amount: vatAmount.toFixed(2),
+        vat_type: vatType,
+      };
+    });
   const expenseDate = date(reading?.date) || formData.expense_date;
 
   return {

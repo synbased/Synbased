@@ -27,13 +27,23 @@
 .site .site-menu-button span {position: absolute; left: 9px; width: 12px; height: 1.5px; border-radius: 1px; background: var(--font-color1); transition: top .2s ease, transform .2s ease;}
 .site .site-menu-button span:first-child {top: 12px;}
 .site .site-menu-button span:last-child {top: 17px;}
+.site .site-menu-button.open {border-color: transparent;}
 .site .site-menu-button.open span:first-child {top: 14.5px; transform: rotate(45deg);}
 .site .site-menu-button.open span:last-child {top: 14.5px; transform: rotate(-45deg);}
-.site .site-mobile-menu {position: absolute; top: 100%; left: 0; right: 0; height: calc(100dvh - 64px); display: flex; flex-direction: column; padding: var(--space20); box-sizing: border-box; background: var(--color2); overflow-y: auto; animation: site-fade-in .15s ease;}
+.site .site-mobile-menu {position: absolute; top: 100%; left: 0; right: 0; height: calc(100dvh - 64px); display: flex; flex-direction: column; padding: var(--space30) var(--space20); box-sizing: border-box; background: var(--color2); overflow-y: auto; animation: site-fade-in .15s ease;}
 .site .site-mobile-actions {display: flex; flex-direction: column; gap: var(--space10); margin: 0 0 var(--space20) 0;}
-.site .site-mobile-actions .button {width: 100%; padding: 12px var(--space20);}
-.site .site-mobile-menu > a {padding: var(--space15) 0; border-bottom: 1px solid var(--border-color); color: var(--font-color2); font-size: 16px; text-decoration: none;}
-.site .site-mobile-menu > a.active {color: var(--font-color1); font-weight: 500;}
+.site .site-mobile-actions .button, .site .site-mobile-demo {width: 100%; padding: 14px var(--space20);}
+.site .site-mobile-user {display: flex; justify-content: space-between; align-items: center; gap: var(--space15); margin: 0 0 var(--space15) 0;}
+.site .site-mobile-user > span:first-child {display: flex; flex-direction: column; min-width: 0;}
+.site .site-mobile-user strong {font-size: 22px; font-weight: 500; letter-spacing: -.01em;}
+.site .site-mobile-user strong + span {color: var(--font-color2); font-size: 14px; overflow: hidden; text-overflow: ellipsis;}
+.site .site-mobile-avatar {display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; background: var(--color1); color: var(--color2); font-size: 12px; font-weight: 600;}
+.site .site-mobile-row {display: flex; justify-content: space-between; align-items: center; width: 100%; padding: var(--space10) 0; border: 0; background: none; color: var(--font-color2); font: inherit; font-size: 17px; text-align: left; text-decoration: none; cursor: pointer;}
+.site .site-mobile-row:hover, .site .site-mobile-link:hover {color: var(--font-color1);}
+.site .site-mobile-divider {width: 100%; margin: var(--space20) 0; border: 0; border-top: 1px solid var(--border-color);}
+.site .site-mobile-link {padding: var(--space10) 0; color: var(--font-color2); font-size: 26px; letter-spacing: -.02em; text-decoration: none;}
+.site .site-mobile-link.active {color: var(--font-color1);}
+.site .site-mobile-demo {margin: var(--space30) 0 0 0;}
 
 .site .site-hero {position: relative; padding: var(--space100) 0 0 0; text-align: center; overflow: hidden; background-image: linear-gradient(var(--border-color) 1px, transparent 1px), linear-gradient(90deg, var(--border-color) 1px, transparent 1px); background-size: 64px 64px; background-position: center top;}
 .site .site-hero::before {content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse 70% 55% at 50% 30%, transparent 0%, var(--color2) 85%); pointer-events: none;}
@@ -260,6 +270,8 @@
   .site .site-header .site-container {justify-content: space-between; gap: var(--space10);}
   .site .site-logo {margin-right: auto;}
   .site .site-menu-button {display: block;}
+  /* Met het menu open alleen het logo en het kruisje in de kop, zoals bij Vercel */
+  .site .site-header.menu-open .site-actions {display: none;}
   .site .site-grid {grid-template-columns: repeat(2, minmax(0, 1fr));}
   .site .site-feature, .site .site-feature.reverse, .site .site-split, .site .site-price {grid-template-columns: minmax(0, 1fr); gap: var(--space40);}
   .site .site-feature.reverse .site-feature-text {order: 0;}

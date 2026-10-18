@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSession } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
+import { LayoutDashboard, LogOut, Settings } from 'lucide-react';
 import { pageTitle } from '@/lib/constants';
 
 /** De pagina's in het menu, bovenin en in het mobiele menu */
@@ -30,8 +31,11 @@ export default function SiteLayout({
   description: string;
   children: ReactNode;
 }) {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const loggedIn = status === 'authenticated';
+  const userName = session?.user?.name || '';
+  const userEmail = session?.user?.email || '';
+  const initials = (userName || userEmail).split(/[\s@.]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -40,6 +44,14 @@ export default function SiteLayout({
 
   // Naar een andere pagina: het menu dicht
   useEffect(() => setMenuOpen(false), [router.asPath]);
+
+  // Wordt het scherm breed genoeg voor het gewone menu, dan gaat het mobiele dicht
+  useEffect(() => {
+    const wide = window.matchMedia('(min-width: 1001px)');
+    const onChange = () => wide.matches && setMenuOpen(false);
+    wide.addEventListener('change', onChange);
+    return () => wide.removeEventListener('change', onChange);
+  }, []);
 
   // Met het menu open scrolt de pagina erachter niet mee, en Escape sluit hem
   useEffect(() => {
@@ -78,7 +90,7 @@ export default function SiteLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <header className="site-header">
+      <header className={`site-header${menuOpen ? ' menu-open' : ''}`}>
         <div className="site-container">
           <Link href="/" className="site-logo" aria-label="Synbased, naar de homepage">
             <Image src="/logo.svg" alt="" width={28} height={28} priority />
@@ -109,12 +121,40 @@ export default function SiteLayout({
 
         {menuOpen && (
           <nav className="site-mobile-menu" aria-label="Menu">
-            <div className="site-mobile-actions">{actions}</div>
+            {loggedIn ? (
+              // Ingelogd, zoals bij Vercel: wie je bent, je account, en daaronder de website
+              <>
+                <div className="site-mobile-user">
+                  <span>
+                    <strong>{userName || userEmail}</strong>
+                    {userName && <span>{userEmail}</span>}
+                  </span>
+                  <span className="site-mobile-avatar">{initials}</span>
+                </div>
+                <Link href="/app/dashboard" className="site-mobile-row">
+                  Dashboard <LayoutDashboard size={20} />
+                </Link>
+                <Link href="/app/settings" className="site-mobile-row">
+                  Instellingen <Settings size={20} />
+                </Link>
+                <button type="button" className="site-mobile-row" onClick={() => signOut({ callbackUrl: '/' })}>
+                  Uitloggen <LogOut size={20} />
+                </button>
+                <hr className="site-mobile-divider" />
+              </>
+            ) : (
+              <div className="site-mobile-actions">{actions}</div>
+            )}
             {NAVIGATION.map(({ href, label }) => (
-              <Link key={href} href={href} className={isActive(href) ? 'active' : ''}>
+              <Link key={href} href={href} className={`site-mobile-link${isActive(href) ? ' active' : ''}`}>
                 {label}
               </Link>
             ))}
+            {loggedIn && (
+              <Link href="/demo" className="button tertiary site-mobile-demo">
+                Demo aanvragen
+              </Link>
+            )}
           </nav>
         )}
       </header>

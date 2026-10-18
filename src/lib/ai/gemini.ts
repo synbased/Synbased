@@ -15,12 +15,22 @@ const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 /** Een vast, rustiger model om op terug te vallen als het nieuwste Flash-model overbelast is */
 const FALLBACK_MODEL = 'gemini-2.5-flash';
 
+/**
+ * Voor bonnen: Flash-Lite is gemaakt voor snel overtikwerk zoals dit, en veel
+ * minder druk dan het nieuwste Flash-model. Met GEMINI_RECEIPT_MODEL kies je
+ * zelf een ander model.
+ */
+const RECEIPT_MODEL = process.env.GEMINI_RECEIPT_MODEL || 'gemini-2.5-flash-lite';
+
 /** Zo lang wachten voor een volgende poging, in milliseconden */
 const RETRY_DELAYS = [800, 2000];
 
-/** Zo lang mag één vraag duren; en na zoveel tijd in totaal geen nieuwe poging meer */
-const REQUEST_TIMEOUT = 25_000;
-const RETRY_BUDGET = 20_000;
+/**
+ * Zo lang mag één vraag duren, en na zoveel tijd in totaal geen nieuwe poging
+ * meer. Samen ruim binnen de 60 seconden die de route krijgt.
+ */
+const REQUEST_TIMEOUT = 45_000;
+const RETRY_BUDGET = 12_000;
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -32,7 +42,11 @@ const isTemporary = (error: unknown) => error instanceof ApiError && [500, 502, 
  * (503). Blijft het nieuwste Flash-model overbelast, dan nog één keer met een
  * vast model. Wie zelf GEMINI_MODEL instelt, blijft bij dat model.
  */
-async function withRetries<T>(ask: (model: string) => Promise<T>): Promise<T> {
+async function withRetries<T>(
+  ask: (model: string) => Promise<T>,
+  model = MODEL,
+  fallback: string | null = process.env.GEMINI_MODEL ? null : FALLBACK_MODEL
+): Promise<T> {
   // Alles samen blijft ruim binnen de tijd die de server een aanvraag geeft;
   // anders krijgt de gebruiker een foutpagina in plaats van een melding
   const started = Date.now();
@@ -40,15 +54,15 @@ async function withRetries<T>(ask: (model: string) => Promise<T>): Promise<T> {
 
   for (let attempt = 0; ; attempt++) {
     try {
-      return await ask(MODEL);
+      return await ask(model);
     } catch (error) {
       if (!isTemporary(error)) throw error;
       if (attempt < RETRY_DELAYS.length && timeLeft(RETRY_DELAYS[attempt])) {
         await wait(RETRY_DELAYS[attempt]);
         continue;
       }
-      if (process.env.GEMINI_MODEL || MODEL === FALLBACK_MODEL || !timeLeft(0)) throw error;
-      return ask(FALLBACK_MODEL);
+      if (!fallback || fallback === model || !timeLeft(0)) throw error;
+      return ask(fallback);
     }
   }
 }
@@ -121,9 +135,6 @@ export const gemini: AiProvider = {
   },
 
   async readReceipt(apiKey, file) {
-    // Een bon overnemen is geen denkwerk; zonder nadenken is Flash vele malen
-    // sneller. Nieuwe Flash-modellen kennen een denkniveau, Gemini 2.5 een
-    // budget; kent het model het niveau niet, dan proberen we het budget
     const read = (model: string, thinkingConfig: ThinkingConfig) =>
       client(apiKey).models.generateContent({
         model,
@@ -144,22 +155,36 @@ export const gemini: AiProvider = {
         },
       });
 
+    // Een bon overnemen is geen denkwerk. Gemini 2.5 zet nadenken uit met een
+    // budget van 0, nieuwere modellen met het laagste denkniveau; meteen de
+    // goede, zodat er geen tweede vraag nodig is. Kent het model hem toch
+    // niet, dan alsnog de andere
+    let usedModel = RECEIPT_MODEL;
     const readWithoutThinking = async (model: string) => {
+      usedModel = model;
+      const first: ThinkingConfig = /2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: ThinkingLevel.MINIMAL };
       try {
-        return await read(model, { thinkingLevel: ThinkingLevel.MINIMAL });
+        return await read(model, first);
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error;
-        return read(model, { thinkingBudget: 0 });
+        return read(model, 'thinkingBudget' in first ? { thinkingLevel: ThinkingLevel.MINIMAL } : { thinkingBudget: 0 });
       }
     };
 
+    // In de logs van Vercel: welk model en hoe lang, zodat traagheid te vinden is
+    const started = Date.now();
     try {
-      const response = await withRetries(readWithoutThinking);
+      const response = await withRetries(readWithoutThinking, RECEIPT_MODEL, process.env.GEMINI_RECEIPT_MODEL ? null : FALLBACK_MODEL);
+      console.log(`[gemini] bon gelezen met ${usedModel} in ${Date.now() - started} ms`);
 
       const parsed = ReceiptReadingSchema.safeParse(JSON.parse(response.text || 'null'));
       if (!parsed.success) throw new Error('De AI kon dit bestand niet lezen. Vul de gegevens met de hand in.');
       return parsed.data;
     } catch (error) {
+      console.error(
+        `[gemini] bon lezen mislukt met ${usedModel} na ${Date.now() - started} ms:`,
+        error instanceof ApiError ? `${error.status} ${error.message}` : error
+      );
       if (error instanceof SyntaxError) {
         throw new Error('De AI kon dit bestand niet lezen. Vul de gegevens met de hand in.');
       }

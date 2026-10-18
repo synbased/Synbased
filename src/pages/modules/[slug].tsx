@@ -3,7 +3,8 @@ import Link from 'next/link';
 import type { GetStaticPaths, GetStaticProps } from 'next';
 import { ArrowLeft, Check } from 'lucide-react';
 import SiteLayout from '@/components/site/SiteLayout';
-import { MODULES, ModuleCell, findModule } from '@/components/site/modules';
+import { MODULES, MODULE_GUIDES, ModuleCell, findModule } from '@/components/site/modules';
+import { FaqSection } from '@/components/site/sections';
 import ModuleDemo from '@/components/site/ModuleDemo';
 
 /**
@@ -14,6 +15,7 @@ export default function ModulePage({ slug }: { slug: string }) {
   const module = findModule(slug)!;
   const Icon = module.icon;
   const related = module.related.map(findModule).filter((m): m is NonNullable<typeof m> => !!m);
+  const guide = MODULE_GUIDES[module.slug];
 
   return (
     <SiteLayout title={module.name} description={module.summary}>
@@ -104,6 +106,34 @@ export default function ModulePage({ slug }: { slug: string }) {
           <ModuleDemo key={module.slug} module={module} />
         </div>
       </section>
+
+      {guide && (
+        <section className="site-section">
+          <div className="site-container site-narrow">
+            <div className="site-section-head">
+              <span className="site-eyebrow">Uitleg</span>
+              <h2>Hoe {module.name.toLowerCase()} werkt.</h2>
+            </div>
+            <div className="site-guide">
+              {guide.topics.map((topic) => (
+                <div key={topic.title}>
+                  <h3>{topic.title}</h3>
+                  <p>{topic.text}</p>
+                  {topic.steps && (
+                    <ol>
+                      {topic.steps.map((step) => (
+                        <li key={step}>{step}</li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {guide && guide.faq.length > 0 && <FaqSection items={guide.faq} title={`Vragen over ${module.name.toLowerCase()}`} />}
 
       {related.length > 0 && (
         <section className="site-section">

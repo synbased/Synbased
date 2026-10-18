@@ -151,6 +151,13 @@
 .site .site-facts div {display: grid; grid-template-columns: 110px 1fr; gap: var(--space20);}
 .site .site-facts dt {color: var(--font-color2);}
 .site .site-facts dd {margin: 0;}
+/* De uitleg onder de demo: per onderwerp een kopje, tekst en waar nodig genummerde stappen */
+.site .site-guide > div {padding: var(--space30) 0; border-top: 1px solid var(--border-color);}
+.site .site-guide > div:first-child {padding-top: 0; border-top: 0;}
+.site .site-guide h3 {margin: 0 0 var(--space10) 0; font-size: 20px;}
+.site .site-guide p {margin: 0; color: var(--font-color2); font-size: 16px;}
+.site .site-guide ol {margin: var(--space15) 0 0 0; padding-left: var(--space20); color: var(--font-color2); font-size: 16px;}
+.site .site-guide li {margin: 0 0 var(--space10) 0; padding-left: var(--space5);}
 
 /* Het demoblok op de pagina van een module: links de stappen met een
    voortgangsbalk, rechts een nagebouwd scherm uit de app dat per stap laat

@@ -18,6 +18,10 @@ const FALLBACK_MODEL = 'gemini-2.5-flash';
 /** Zo lang wachten voor een volgende poging, in milliseconden */
 const RETRY_DELAYS = [800, 2000];
 
+/** Zo lang mag één vraag duren; en na zoveel tijd in totaal geen nieuwe poging meer */
+const REQUEST_TIMEOUT = 25_000;
+const RETRY_BUDGET = 20_000;
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Een fout aan de kant van Google die meestal vanzelf overgaat: overbelast of even onbereikbaar */
@@ -29,16 +33,21 @@ const isTemporary = (error: unknown) => error instanceof ApiError && [500, 502, 
  * vast model. Wie zelf GEMINI_MODEL instelt, blijft bij dat model.
  */
 async function withRetries<T>(ask: (model: string) => Promise<T>): Promise<T> {
+  // Alles samen blijft ruim binnen de tijd die de server een aanvraag geeft;
+  // anders krijgt de gebruiker een foutpagina in plaats van een melding
+  const started = Date.now();
+  const timeLeft = (needed: number) => Date.now() - started + needed < RETRY_BUDGET;
+
   for (let attempt = 0; ; attempt++) {
     try {
       return await ask(MODEL);
     } catch (error) {
       if (!isTemporary(error)) throw error;
-      if (attempt < RETRY_DELAYS.length) {
+      if (attempt < RETRY_DELAYS.length && timeLeft(RETRY_DELAYS[attempt])) {
         await wait(RETRY_DELAYS[attempt]);
         continue;
       }
-      if (process.env.GEMINI_MODEL || MODEL === FALLBACK_MODEL) throw error;
+      if (process.env.GEMINI_MODEL || MODEL === FALLBACK_MODEL || !timeLeft(0)) throw error;
       return ask(FALLBACK_MODEL);
     }
   }
@@ -51,7 +60,7 @@ const { $schema: _version, ...RESPONSE_SCHEMA } = z.toJSONSchema(QuoteProposalSc
 const { $schema: _receiptVersion, ...RECEIPT_SCHEMA } = z.toJSONSchema(ReceiptReadingSchema);
 
 function client(apiKey: string) {
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey, httpOptions: { timeout: REQUEST_TIMEOUT } });
 }
 
 /** Een fout van Google als een melding die de gebruiker begrijpt. */
@@ -70,6 +79,10 @@ function explain(error: unknown): Error {
       return new Error('Gemini is even overbelast. Probeer het over een minuut opnieuw.');
     }
     return new Error(`Gemini gaf een fout (${error.status}). Probeer het opnieuw.`);
+  }
+  // De vraag duurde langer dan REQUEST_TIMEOUT
+  if (error instanceof Error && (/abort|timeout|timed out/i.test(error.name) || /abort|timeout|timed out/i.test(error.message))) {
+    return new Error('Gemini reageerde niet op tijd. Probeer het opnieuw.');
   }
   return error instanceof Error ? error : new Error('De AI is niet bereikbaar');
 }

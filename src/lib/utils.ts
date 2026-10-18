@@ -87,6 +87,24 @@ export function allPriceTables(blocks: DocumentBlock[]): DocumentElement[] {
   return blocks.flatMap(block => block.elements.filter(e => e.kind === 'prijstabel'));
 }
 
+/**
+ * Het JSON-antwoord van een API-route. Komt er geen JSON terug, zoals de
+ * foutpagina van Vercel als een aanvraag te lang duurde, dan een melding in
+ * plaats van "Unexpected token".
+ */
+export async function readJson(response: Response): Promise<any> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: response.status === 504 || /timeout/i.test(text)
+        ? 'Dit duurde te lang. Probeer het opnieuw, of vul het met de hand in.'
+        : 'Er ging iets mis op de server. Probeer het opnieuw.',
+    };
+  }
+}
+
 /** Bedrag als € 1.234,56 */
 export function formatCurrency(amount: number, currency = 'EUR'): string {
   return new Intl.NumberFormat('nl-NL', { style: 'currency', currency }).format(amount || 0);

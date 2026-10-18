@@ -1,3 +1,4 @@
+import { readJson } from '@/lib/utils';
 import HelpButton from '@/components/HelpButton';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -82,7 +83,7 @@ export default function EditExpense() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: { data: prepared.data, name: prepared.name } }),
       });
-      const reading = await response.json();
+      const reading = await readJson(response);
       if (!response.ok) {
         toast.error('Niet gelezen', reading.error || 'Vul de gegevens met de hand in');
         return;
@@ -119,7 +120,7 @@ export default function EditExpense() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data = await readJson(response);
         toast.error('Fout', data.error || 'Er is iets misgegaan');
         setIsLoading(false);
         return;

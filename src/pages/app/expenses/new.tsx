@@ -14,7 +14,7 @@ import ExpenseFields, {
   type ExpenseFile,
   type ExpenseFormData,
 } from '@/components/ExpenseFields';
-import { vandaag } from '@/lib/utils';
+import { vandaag, readJson } from '@/lib/utils';
 
 export default function NewExpense() {
   const toast = useToast();
@@ -59,7 +59,7 @@ export default function NewExpense() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ file: { data: prepared.data, name: prepared.name } }),
       });
-      const reading = await response.json();
+      const reading = await readJson(response);
       if (!response.ok) {
         toast.error('Niet gelezen', reading.error || 'Vul de gegevens met de hand in');
         return;
@@ -94,7 +94,7 @@ export default function NewExpense() {
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data = await readJson(response);
         toast.error('Fout', data.error || 'Er is iets misgegaan');
         setIsLoading(false);
         return;

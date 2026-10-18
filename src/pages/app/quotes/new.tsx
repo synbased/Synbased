@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import { Undo2, Redo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { useHistory } from '@/hooks/useHistory';
@@ -21,6 +22,7 @@ const currencyOptions = [
 export default function NewQuote() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [formData, setFormData] = useState({
@@ -28,6 +30,7 @@ export default function NewQuote() {
     quote_date: vandaag(),
     valid_until: overDagen(30),
     customer_id: '',
+    project_id: '',
     currency: 'EUR',
     blocks: startBlocks() as DocumentBlock[],
     intro_text: '',
@@ -72,6 +75,10 @@ export default function NewQuote() {
         : data.length > 0 ? String(data[0].id) : '';
 
       if (gekozen) setFormData(prev => ({ ...prev, customer_id: gekozen }));
+      // Vanuit een project staat dat project al goed
+      if (typeof router.query.project_id === 'string') {
+        setFormData(prev => ({ ...prev, project_id: router.query.project_id as string }));
+      }
     } catch (err) {
       console.error('Error fetching customers:', err);
     }
@@ -111,6 +118,7 @@ export default function NewQuote() {
           quote_date: formData.quote_date,
           valid_until: formData.valid_until,
           customer_id: formData.customer_id,
+          project_id: formData.project_id || null,
           currency: formData.currency,
           intro_text: formData.intro_text || null,
           notes: formData.notes || null,
@@ -187,6 +195,18 @@ export default function NewQuote() {
                   onChange={(option) => setFormData({ ...formData, customer_id: option?.value || '' })}
                   options={customerOptions}
                   placeholder="Selecteer een klant"
+                />
+              </div>
+            </div>
+            <div className="form-section">
+              <div className="form-group">
+                <label>Project</label>
+                <Select
+                  value={projectOptions.find(o => o.value === formData.project_id) || null}
+                  onChange={(option) => setFormData({ ...formData, project_id: option?.value || '' })}
+                  options={projectOptions}
+                  placeholder="Geen project"
+                  isClearable
                 />
               </div>
             </div>

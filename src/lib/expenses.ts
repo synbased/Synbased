@@ -50,6 +50,7 @@ export function expenseFromBody(body: any): {
   fields.description = String(body.description || '').trim() || null;
   fields.due_date = DATE.test(String(body.due_date || '')) ? body.due_date : null;
   fields.category = EXPENSE_CATEGORIES.some(c => c.value === body.category) ? body.category : 'other';
+  fields.project_id = Number(body.project_id) > 0 ? Number(body.project_id) : null;
   fields.status = body.status === 'paid' ? 'paid' : 'open';
   fields.paid_at = fields.status === 'paid' ? (DATE.test(String(body.paid_at || '')) ? body.paid_at : body.expense_date) : null;
 

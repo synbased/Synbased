@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { deleteExpense, getExpense, updateExpense } from '@/lib/db';
 import { expenseFromBody } from '@/lib/expenses';
+import { projectIdFromBody } from '@/lib/projects';
 
 export const config = {
   api: {
@@ -24,6 +25,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
+      // Alleen het project koppelen, vanaf de pagina van een project
+      if (Object.keys(req.body || {}).length === 1 && 'project_id' in req.body) {
+        const expense = await updateExpense(id, tenantId, { project_id: projectIdFromBody(req.body.project_id) });
+        return res.status(200).json(expense);
+      }
+
       const { fields, lines, problem } = expenseFromBody(req.body);
       if (problem) return res.status(400).json({ error: problem });
 

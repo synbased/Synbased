@@ -85,6 +85,30 @@ export const HELP: Record<string, HelpTopic> = {
       },
     ],
   },
+  projects: {
+    title: 'Over projecten',
+    intro: [
+      'Een project is een klus, zoals "Badkamer Familie Verhoef". De offerte, facturen, bonnen en notities horen erbij, zodat je per klus ziet wat je verdient.',
+    ],
+    sections: [
+      {
+        title: 'Zo werkt het',
+        items: [
+          'Maak een project en kies de klant. Bij een offerte, factuur, kostenpost of notitie kies je het project bij het veld Project.',
+          'Bestond het al? Koppel het vanaf het project met de knop Koppelen. Ook een verstuurde factuur kun je koppelen.',
+          'Een factuur uit een offerte, en een creditfactuur, nemen het project vanzelf over.',
+        ],
+      },
+      {
+        title: 'Cijfers en termijnen',
+        items: [
+          'Het overzicht toont geoffreerd (goedgekeurde offertes), gefactureerd (verstuurde facturen) en de kosten, alles exclusief btw, met de marge die overblijft.',
+          'Met Termijnfactuur maken factureer je een deel van een goedgekeurde offerte, zoals 30% bij opdracht. Elke prijstabel komt er naar rato op, met hetzelfde btw-tarief; je krijgt een concept om na te kijken.',
+          'Meer dan 100% van een offerte factureren kan niet; je ziet per offerte hoeveel er al gefactureerd is.',
+        ],
+      },
+    ],
+  },
   quotes: {
     title: 'Over offertes',
     intro: [

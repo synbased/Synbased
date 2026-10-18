@@ -138,6 +138,30 @@ CREATE TRIGGER update_customers_updated_at
 -- ------------------------------------------------------------
 -- Offertes
 -- ------------------------------------------------------------
+-- Projecten: een klus, met de offertes, facturen, kosten en notities erbij
+-- ------------------------------------------------------------
+CREATE TABLE projects (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('quote', 'planned', 'active', 'completed')),
+  -- Het adres van de klus, als dat een ander is dan dat van de klant
+  address TEXT,
+  start_date DATE,
+  end_date DATE,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX projects_tenant_id_idx ON projects(tenant_id);
+
+CREATE TRIGGER update_projects_updated_at
+  BEFORE UPDATE ON projects
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ------------------------------------------------------------
 CREATE TABLE quotes (
   id BIGSERIAL PRIMARY KEY,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -166,6 +190,8 @@ CREATE TABLE quotes (
   view_count INTEGER NOT NULL DEFAULT 0,
   sent_by UUID REFERENCES users(id) ON DELETE SET NULL,
   reminder_sent_at TIMESTAMPTZ,
+  -- Het project (de klus) waar dit bij hoort
+  project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -263,6 +289,8 @@ CREATE TABLE invoices (
   -- Hoeveel betalingsherinneringen er gingen, en wanneer de laatste
   reminder_count INTEGER NOT NULL DEFAULT 0,
   reminder_sent_at TIMESTAMPTZ,
+  -- Het project (de klus) waar dit bij hoort
+  project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -357,6 +385,8 @@ CREATE TABLE expenses (
   file_path TEXT,
   file_name TEXT,
   file_type TEXT,
+  -- Het project (de klus) waar dit bij hoort
+  project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -454,6 +484,8 @@ CREATE TABLE notes (
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
+  -- Het project (de klus) waar dit bij hoort
+  project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -647,6 +679,7 @@ ALTER TABLE whatsapp_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE password_resets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mollie_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_lines ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bank_accounts ENABLE ROW LEVEL SECURITY;

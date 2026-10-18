@@ -182,6 +182,8 @@ export interface Invoice {
   /** Hoeveel betalingsherinneringen er gingen, en wanneer de laatste */
   reminder_count?: number;
   reminder_sent_at?: string | null;
+  /** Het project (de klus) waar dit bij hoort */
+  project_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -213,6 +215,8 @@ export interface Quote {
   /** Wie hem verstuurde; de herinnering gaat vanuit diens mailbox */
   sent_by?: string | null;
   reminder_sent_at?: string | null;
+  /** Het project (de klus) waar dit bij hoort */
+  project_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -225,6 +229,21 @@ export interface Product {
   unit: string | null;
   /** Prijs per eenheid, exclusief btw */
   price: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Een klus, met de offertes, facturen, kosten en notities die erbij horen */
+export interface Project {
+  id: number;
+  tenant_id: string;
+  customer_id: number | null;
+  name: string;
+  status: 'quote' | 'planned' | 'active' | 'completed';
+  address: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  description: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -264,6 +283,8 @@ export interface Expense {
   file_name: string | null;
   file_type: string | null;
   lines?: ExpenseLine[];
+  /** Het project (de klus) waar dit bij hoort */
+  project_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -306,6 +327,8 @@ export interface Note {
   customer_id: number;
   title: string;
   content: string;
+  /** Het project (de klus) waar dit bij hoort */
+  project_id?: number | null;
   created_at: string;
   updated_at: string;
 }

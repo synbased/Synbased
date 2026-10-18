@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import { Undo2, Redo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
 import { useHistory } from '@/hooks/useHistory';
@@ -21,12 +22,21 @@ const currencyOptions = [
 export default function NewInvoice() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
+
+  // Vanuit een project staat dat project al goed
+  useEffect(() => {
+    if (typeof router.query.project_id === 'string') {
+      setFormData(prev => ({ ...prev, project_id: router.query.project_id as string }));
+    }
+  }, [router.query.project_id]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
   const [formData, setFormData] = useState({
     invoice_date: vandaag(),
     due_date: overDagen(30),
     customer_id: '',
+    project_id: '',
     currency: 'EUR',
     blocks: startBlocks() as DocumentBlock[],
     intro_text: '',
@@ -85,6 +95,7 @@ export default function NewInvoice() {
           invoice_date: formData.invoice_date,
           due_date: formData.due_date,
           customer_id: formData.customer_id,
+          project_id: formData.project_id || null,
           currency: formData.currency,
           intro_text: formData.intro_text || null,
           notes: formData.notes || null,
@@ -162,6 +173,18 @@ export default function NewInvoice() {
                   onChange={(option) => setFormData({ ...formData, customer_id: option?.value || '' })}
                   options={customerOptions}
                   placeholder="Selecteer een klant"
+                />
+              </div>
+            </div>
+            <div className="form-section">
+              <div className="form-group">
+                <label>Project</label>
+                <Select
+                  value={projectOptions.find(o => o.value === formData.project_id) || null}
+                  onChange={(option) => setFormData({ ...formData, project_id: option?.value || '' })}
+                  options={projectOptions}
+                  placeholder="Geen project"
+                  isClearable
                 />
               </div>
             </div>

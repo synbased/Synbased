@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Link from 'next/link';
 import { Undo2, Redo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
@@ -35,6 +36,7 @@ const statusOptions = [
 export default function EditQuote() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const { confirm } = useConfirm();
   const mailAccount = useMailAccount();
   const { id } = router.query;
@@ -47,6 +49,7 @@ export default function EditQuote() {
     quote_date: vandaag(),
     valid_until: overDagen(30),
     customer_id: '',
+    project_id: '',
     currency: 'EUR',
     status: 'draft',
     blocks: [] as DocumentBlock[],
@@ -89,6 +92,7 @@ export default function EditQuote() {
         quote_date: quote.quote_date || vandaag(),
         valid_until: quote.valid_until || vandaag(),
         customer_id: String(quote.customer_id),
+        project_id: quote.project_id ? String(quote.project_id) : '',
         currency: quote.currency || 'EUR',
         status: quote.status,
         blocks: copyBlocks(quote.blocks),
@@ -133,6 +137,7 @@ export default function EditQuote() {
         quote_date: data.quote_date,
         valid_until: data.valid_until,
         customer_id: data.customer_id,
+        project_id: data.project_id || null,
         status: data.status,
         currency: data.currency,
         intro_text: data.intro_text || null,
@@ -354,6 +359,18 @@ export default function EditQuote() {
                   onChange={(option) => setFormData({ ...formData, customer_id: option?.value || '' })}
                   options={customerOptions}
                   placeholder="Selecteer een klant"
+                />
+              </div>
+            </div>
+            <div className="form-section">
+              <div className="form-group">
+                <label>Project</label>
+                <Select
+                  value={projectOptions.find(o => o.value === formData.project_id) || null}
+                  onChange={(option) => setFormData({ ...formData, project_id: option?.value || '' })}
+                  options={projectOptions}
+                  placeholder="Geen project"
+                  isClearable
                 />
               </div>
             </div>

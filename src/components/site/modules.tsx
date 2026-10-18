@@ -13,6 +13,7 @@ import {
   ReceiptEuro,
   Sparkles,
   Users,
+  FolderKanban,
   type LucideIcon,
 } from 'lucide-react';
 import { GoogleIcon, MicrosoftIcon, MollieIcon, WhatsAppIcon } from '@/components/BrandIcons';
@@ -130,6 +131,32 @@ export const MODULES: SiteModule[] = [
       { label: 'Werkt met', value: 'Offertes, Notities' },
     ],
     related: ['notes', 'quotes', 'ai'],
+  },
+  {
+    slug: 'projects',
+    name: 'Projecten',
+    kind: 'standard',
+    group: 'Verkoop',
+    icon: FolderKanban,
+    summary: 'Per klus de offerte, facturen, bonnen en notities bij elkaar, met je marge.',
+    lead: 'Maak een project per klus, zoals "Badkamer Familie Verhoef". Je ziet wat er geoffreerd, gefactureerd en uitgegeven is, en wat je eraan overhoudt. Grote klussen factureer je in termijnen.',
+    features: [
+      { title: 'Alles bij de klus', text: 'Offertes, facturen, bonnen en notities op één plek, met de klant en het adres.' },
+      { title: 'Marge per project', text: 'Gefactureerd min kosten, exclusief btw, zodat je ziet wat een klus oplevert.' },
+      { title: 'Termijnfacturen', text: 'Factureer een deel van de offerte, zoals 30% vooraf, met de juiste btw.' },
+      { title: 'Fases', text: 'Van offerte via gepland en in uitvoering tot opgeleverd.' },
+    ],
+    steps: [
+      { title: 'Maak het project', text: 'Kies de klant en zet de offerte erbij.' },
+      { title: 'Factureer in termijnen', text: 'Een percentage van de getekende offerte, als concept om na te kijken.' },
+      { title: 'Zie je marge', text: 'Bonnen bij het project komen van de omzet af.' },
+    ],
+    facts: [
+      { label: 'Soort', value: 'Standaard' },
+      { label: 'Kosten', value: 'Inbegrepen' },
+      { label: 'Werkt met', value: 'Offertes, Facturen, Kosten, Notities' },
+    ],
+    related: ['quotes', 'invoices', 'expenses'],
   },
   {
     slug: 'products',

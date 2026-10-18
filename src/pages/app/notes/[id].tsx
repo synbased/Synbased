@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Layout from '@/components/Layout';
 import { useToast } from '@/components/Toast';
 import NoteFields, { validateNote } from '@/components/NoteFields';
@@ -19,11 +20,13 @@ interface NoteWithCustomer extends Note {
 export default function EditNote() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const { id } = router.query;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [note, setNote] = useState<NoteWithCustomer | null>(null);
   const [formData, setFormData] = useState({
     customer_id: '',
+    project_id: '',
     title: '',
     content: '',
   });
@@ -48,6 +51,7 @@ export default function EditNote() {
       setNote(data);
       setFormData({
         customer_id: String(data.customer_id),
+        project_id: data.project_id ? String(data.project_id) : '',
         title: data.title,
         content: data.content,
       });
@@ -166,6 +170,7 @@ export default function EditNote() {
             formData={formData}
             onChange={setFormData}
             customerOptions={customerOptions}
+            projectOptions={projectOptions}
             errors={showErrors ? validateNote(formData) : {}}
           />
         </form>

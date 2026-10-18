@@ -18,6 +18,7 @@ import {
   Upload,
   Users,
   CalendarDays,
+  FolderKanban,
 } from 'lucide-react';
 import { GoogleIcon, MicrosoftIcon, MollieIcon } from '@/components/BrandIcons';
 import type { SiteModule } from './modules';
@@ -85,6 +86,7 @@ const NAVIGATION = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
   { key: 'calendar', label: 'Agenda', icon: CalendarDays },
   { key: 'customers', label: 'Klanten', icon: Users },
+  { key: 'projects', label: 'Projecten', icon: FolderKanban },
   { key: 'quotes', label: 'Offertes', icon: FileText },
   { key: 'invoices', label: 'Facturen', icon: ReceiptEuro },
   { key: 'expenses', label: 'Kosten', icon: Receipt },
@@ -684,6 +686,70 @@ const SCENES: Record<string, (() => ReactNode)[]> = {
       </AppPage>
     ),
   ],
+  projects: [
+    () => (
+      <AppPage active="projects" title="Badkamer Familie Verhoef" actions={<><span className="status-badge status-sent">In uitvoering</span><Button kind="cancel">Termijnfactuur maken</Button></>}>
+        <Stats
+          items={[
+            { label: 'Geoffreerd', value: 6040, note: 'Goedgekeurde offertes, excl. btw' },
+            { label: 'Gefactureerd', value: 1812, note: 'Verstuurde facturen, excl. btw' },
+            { label: 'Kosten', value: 640.5, note: 'Bonnen en inkoopfacturen' },
+            { label: 'Marge', value: 1171.5, note: 'Gefactureerd min kosten' },
+          ]}
+        />
+        <div className="block">
+          <div className="header">
+            <h2>Termijnen</h2>
+          </div>
+          <DataTable
+            headers={['Offerte', 'Offertebedrag', 'Gefactureerd', 'Voortgang']}
+            rows={[{ at: 1.4, cells: ['OFF-118', '€ 6.040,00', '€ 1.812,00', <Badge key="b" tone="sent">30%</Badge>] }]}
+          />
+        </div>
+      </AppPage>
+    ),
+    () => {
+      const t = useT();
+      return (
+        <AppPage active="projects" title="Badkamer Familie Verhoef" actions={<Button id="installment" kind="cancel" pressAt={1.4}>Termijnfactuur maken</Button>}>
+          <Stats
+            at={-99}
+            items={[
+              { label: 'Geoffreerd', value: 6040, note: 'Goedgekeurde offertes, excl. btw' },
+              { label: 'Gefactureerd', value: t >= 4.6 ? 4832 : 1812, note: 'Verstuurde facturen, excl. btw' },
+              { label: 'Kosten', value: 640.5, note: 'Bonnen en inkoopfacturen' },
+              { label: 'Marge', value: t >= 4.6 ? 4191.5 : 1171.5, note: 'Gefactureerd min kosten' },
+            ]}
+          />
+          <Dialog from={1.6} until={4.4} title="Termijnfactuur maken">
+            <div className="form-section">
+              <Field label="Omschrijving" text="Termijn 2, halverwege" at={1.9} perSecond={30} />
+              <Field label="Percentage" text="50" at={2.7} />
+            </div>
+            <div className="buttons">
+              <Button kind="cancel">Annuleren</Button>
+              <Button id="create" pressAt={4.1}>Factuur maken</Button>
+            </div>
+          </Dialog>
+          <Cursor path={[['installment', 0.4], ['create', 3.1]]} />
+          <Toast at={4.4} title="Termijnfactuur" message="Termijn 2: 50% van OFF-118 staat klaar als concept" />
+        </AppPage>
+      );
+    },
+    () => (
+      <AppPage active="projects" title="Badkamer Familie Verhoef" actions={<Button>Kosten toevoegen</Button>}>
+        <DataTable
+          headers={['Leverancier', 'Datum', 'Categorie', 'Excl. btw']}
+          rows={[
+            { at: 0.3, cells: ['Gamma Zwolle', '14-10-2026', 'Inkoop materiaal', '€ 82,64'] },
+            { at: 0.6, cells: ['Tegelhuis Utrecht', '15-10-2026', 'Inkoop materiaal', '€ 412,40'] },
+            { at: 0.9, cells: ['Bouwmaat Utrecht', '16-10-2026', 'Gereedschap en klein materiaal', '€ 145,46'] },
+            { at: 1.6, cells: ['', <strong key="s">Marge</strong>, '', <strong key="v">€ 4.191,50</strong>], highlight: true },
+          ]}
+        />
+      </AppPage>
+    ),
+  ],
   products: [
     () => {
       const t = useT();
@@ -1197,6 +1263,7 @@ const CAMERAS: Record<string, CameraPath[]> = {
     [],
   ],
   products: [[], [['suggest', 1.1, 1.4], [null, 4.8]], []],
+  projects: [[['stats', 0.3, 1.3], [null, 3.4]], [['dialog', 1.9, 1.3], [null, 4.4]], []],
   expenses: [[['form', 0.4, 1.25], [null, 5.2]], [], []],
   bank: [[], [['table', 0.3, 1.25], [null, 4.6]], []],
   vat: [[], [['due', 0.4, 1.4], [null, 4.6]], []],

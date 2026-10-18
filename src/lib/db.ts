@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase';
-import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Quote, Tenant, Note, Product } from './supabase';
+import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Project, Quote, Tenant, Note, Product } from './supabase';
 import type { PurchaseVatType, SalesVatType } from './constants';
 import { calculateDocumentTotal, calculateElementTotals, lineTotal } from './utils';
 import { copyBlocks } from './blocks';
@@ -542,6 +542,219 @@ export async function deleteCustomer(id: string | number, tenantId: string) {
   return { success: true };
 }
 
+// Projects
+export async function getProjects(tenantId: string) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select(`*, customer:customers(${CUSTOMER_SUMMARY})`)
+    .eq('tenant_id', tenantId)
+    // Nieuwste bovenaan
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data as (Project & { customer: Partial<Customer> | null })[];
+}
+
+export async function getProject(id: string | number, tenantId: string) {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*, customer:customers(*)')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error('Project niet gevonden');
+  return data as Project & { customer: Customer | null };
+}
+
+/** De velden van een project die iemand zelf invult */
+type ProjectInput = Pick<Project, 'name' | 'customer_id' | 'status' | 'address' | 'start_date' | 'end_date' | 'description'>;
+
+export async function createProject(tenantId: string, fields: ProjectInput) {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ ...fields, tenant_id: tenantId, updated_at: now() })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Project;
+}
+
+export async function updateProject(id: string | number, tenantId: string, fields: Partial<ProjectInput>) {
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ ...fields, updated_at: now() })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Project;
+}
+
+/** Een project weg; wat erbij hoorde blijft bestaan, alleen zonder project */
+export async function deleteProject(id: string | number, tenantId: string) {
+  const { error } = await supabase.from('projects').delete().eq('id', id).eq('tenant_id', tenantId);
+  if (error) throw error;
+  return { success: true };
+}
+
+/**
+ * Per offerte of factuur het bedrag exclusief btw, uit de prijstabellen. Het
+ * totaal op een offerte of factuur is inclusief btw; voor de marge van een
+ * project telt wat er zonder btw overblijft.
+ */
+async function documentBases(soort: Soort, ids: number[], tenantId: string): Promise<Map<number, number>> {
+  const bases = new Map<number, number>();
+  if (ids.length === 0) return bases;
+
+  const { blocksTable, elementsTable, itemsTable, parentKey } = tablesFor(soort);
+  const { data, error } = await supabase
+    .from(blocksTable)
+    .select(`${parentKey}, elements:${elementsTable}(kind, tax_percentage, discount_percentage, vat_type, items:${itemsTable}(quantity, price, is_heading))`)
+    .eq('tenant_id', tenantId)
+    .in(parentKey, ids);
+  if (error) throw error;
+
+  for (const block of (data || []) as any[]) {
+    for (const element of block.elements || []) {
+      if (element.kind !== 'prijstabel') continue;
+      const totals = calculateElementTotals(element);
+      bases.set(block[parentKey], cents((bases.get(block[parentKey]) || 0) + totals.subtotal - totals.discount));
+    }
+  }
+  return bases;
+}
+
+/**
+ * Een project met alles wat erbij hoort, en de cijfers: geoffreerd (wat er
+ * goedgekeurd is), gefactureerd (vastgelegde facturen) en de kosten, alles
+ * exclusief btw, met de marge die overblijft. Per goedgekeurde offerte ook
+ * hoeveel procent er al gefactureerd is, voor de termijnfacturen.
+ */
+export async function getProjectOverview(id: string | number, tenantId: string) {
+  const project = await getProject(id, tenantId);
+
+  const [quotes, invoices, expenses, notes] = await Promise.all([
+    supabase.from('quotes').select('id, quote_number, quote_date, total, status').eq('tenant_id', tenantId).eq('project_id', id).order('quote_date', { ascending: false }),
+    supabase.from('invoices').select('id, invoice_number, invoice_date, total, status, quote_id, credit_for_invoice_id').eq('tenant_id', tenantId).eq('project_id', id).order('created_at', { ascending: false }),
+    supabase.from('expenses').select('id, supplier, expense_date, category, total_excl, total, status').eq('tenant_id', tenantId).eq('project_id', id).order('expense_date', { ascending: false }),
+    supabase.from('notes').select('id, title, updated_at, created_at').eq('tenant_id', tenantId).eq('project_id', id).order('updated_at', { ascending: false }),
+  ]);
+  for (const result of [quotes, invoices, expenses, notes]) if (result.error) throw result.error;
+
+  const quoteBases = await documentBases('quote', (quotes.data || []).map((q: any) => q.id), tenantId);
+  const invoiceBases = await documentBases('invoice', (invoices.data || []).map((i: any) => i.id), tenantId);
+
+  const quoteRows = (quotes.data || []).map((quote: any) => ({ ...quote, base: quoteBases.get(quote.id) || 0 }));
+  const invoiceRows = (invoices.data || []).map((invoice: any) => ({ ...invoice, base: invoiceBases.get(invoice.id) || 0 }));
+  const finalInvoices = invoiceRows.filter(invoice => invoice.status !== 'draft' && invoice.status !== 'cancelled');
+
+  const quoted = cents(quoteRows.filter(q => q.status === 'approved').reduce((sum, q) => sum + q.base, 0));
+  const invoiced = cents(finalInvoices.reduce((sum, i) => sum + i.base, 0));
+  const costs = cents((expenses.data || []).reduce((sum: number, e: any) => sum + (Number(e.total_excl) || 0), 0));
+
+  // Per goedgekeurde offerte: hoeveel er al gefactureerd is, ook concepten meegeteld
+  const progress = quoteRows
+    .filter(q => q.status === 'approved' && q.base > 0)
+    .map(q => {
+      const billed = invoiceRows.filter(i => i.quote_id === q.id && i.status !== 'cancelled').reduce((sum, i) => sum + i.base, 0);
+      return { quote_id: q.id, quote_number: q.quote_number, base: q.base, billed: cents(billed), percentage: Math.round((billed / q.base) * 100) };
+    });
+
+  return {
+    project,
+    quotes: quoteRows,
+    invoices: invoiceRows,
+    expenses: expenses.data || [],
+    notes: notes.data || [],
+    totals: { quoted, invoiced, costs, margin: cents(invoiced - costs) },
+    progress,
+  };
+}
+
+/**
+ * Een termijnfactuur: een percentage van een goedgekeurde offerte, als concept.
+ * Elke prijstabel van de offerte wordt één regel van dat percentage, met
+ * hetzelfde btw-tarief en dezelfde soort, zodat de btw klopt. Meer dan de hele
+ * offerte factureren kan niet.
+ */
+export async function createInstallmentInvoice(
+  projectId: string | number,
+  tenantId: string,
+  { quoteId, percentage, label }: { quoteId: number; percentage: number; label: string }
+) {
+  if (!(percentage > 0 && percentage <= 100)) throw new Error('Kies een percentage tussen 1 en 100');
+
+  const project = await getProject(projectId, tenantId);
+  const quote = await getQuote(quoteId, tenantId);
+  if (quote.project_id !== project.id) throw new Error('Deze offerte hoort niet bij dit project');
+  if (quote.status !== 'approved') throw new Error('Deze offerte is nog niet goedgekeurd door de klant');
+
+  const { progress } = await getProjectOverview(projectId, tenantId);
+  const current = progress.find(p => p.quote_id === quote.id);
+  if (current && current.percentage + percentage > 100) {
+    throw new Error(`Er is al ${current.percentage}% van deze offerte gefactureerd; er kan nog ${100 - current.percentage}% bij`);
+  }
+
+  const tables = (quote.blocks as DocumentBlock[]).flatMap(block => block.elements.filter(element => element.kind === 'prijstabel'));
+  const elements = tables
+    .map((element) => {
+      const totals = calculateElementTotals(element);
+      const base = totals.subtotal - totals.discount;
+      // Bij meer tabellen staat erbij welk tarief, zodat je ze uit elkaar houdt
+      const suffix = tables.length > 1
+        ? ` (${element.vat_type && element.vat_type !== 'normal' ? 'btw verlegd/buitenland' : `${element.tax_percentage}% btw`})`
+        : '';
+      return {
+        kind: 'prijstabel' as const,
+        body: null,
+        tax_percentage: element.tax_percentage,
+        discount_percentage: 0,
+        show_quantity: false,
+        vat_type: element.vat_type || 'normal',
+        items: [{
+          description: `${label || 'Termijn'}: ${percentage}% van offerte ${quote.quote_number}${suffix}`,
+          is_heading: false,
+          quantity: 1,
+          unit: null,
+          price: cents((base * percentage) / 100),
+        }],
+      };
+    })
+    .filter(element => element.items[0].price !== 0);
+
+  if (elements.length === 0) throw new Error('Deze offerte heeft geen bedragen om te factureren');
+
+  const blocks: DocumentBlock[] = [{ title: '', elements: [{ ...emptyDataElement() }, ...elements] }];
+  const today = vandaagHier();
+
+  return createInvoice(
+    {
+      tenant_id: tenantId,
+      customer_id: quote.customer_id,
+      invoice_date: today,
+      due_date: dagenErbij(today, 14),
+      total: calculateDocumentTotal(blocks),
+      status: 'draft',
+      currency: quote.currency,
+      intro_text: null,
+      notes: null,
+      quote_id: quote.id,
+      project_id: project.id,
+    } as Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
+    blocks
+  );
+}
+
+/** Het element met de klant, het nummer en de datums bovenaan een document */
+function emptyDataElement() {
+  return { kind: 'gegevens' as const, body: null, tax_percentage: 21, discount_percentage: 0, show_quantity: false, vat_type: 'normal' as const, items: [] };
+}
+
 // Quotes
 export async function getQuotes(tenantId: string, customerId?: number | string) {
   let query = supabase
@@ -967,6 +1180,7 @@ export async function convertQuoteToInvoice(quoteId: string | number, tenantId: 
       intro_text: quote.intro_text,
       notes: quote.notes,
       quote_id: typeof quoteId === 'number' ? quoteId : parseInt(quoteId as string, 10),
+      project_id: quote.project_id ?? null,
     } as Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
     blocks
   );
@@ -1015,6 +1229,7 @@ export async function createCreditNote(invoiceId: string | number, tenantId: str
       intro_text: invoice.intro_text,
       notes: invoice.notes,
       credit_for_invoice_id: invoice.id,
+      project_id: invoice.project_id ?? null,
     } as Omit<Invoice, 'id' | 'created_at' | 'updated_at'>,
     blocks
   );
@@ -1267,7 +1482,7 @@ async function saveExpenseLines(expenseId: number | string, tenantId: string, li
 }
 
 /** De velden van een kostenpost die iemand zelf invult */
-type ExpenseInput = Pick<Expense, 'supplier' | 'reference' | 'expense_date' | 'due_date' | 'description' | 'category' | 'status' | 'paid_at'>;
+type ExpenseInput = Pick<Expense, 'supplier' | 'reference' | 'expense_date' | 'due_date' | 'description' | 'category' | 'status' | 'paid_at' | 'project_id'>;
 
 /**
  * Een nieuwe kostenpost, met het bonnetje of de inkoopfactuur erbij als die

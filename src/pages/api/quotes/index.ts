@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -32,6 +33,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         intro_text,
         notes,
         blocks,
+        project_id,
       } = req.body;
 
       if (!customer_id || !quote_date || !valid_until) {
@@ -64,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           currency: currency || 'EUR',
           intro_text: intro_text || null,
           notes: notes || null,
+          project_id: projectIdFromBody(project_id) ?? null,
         },
         blocks
       );

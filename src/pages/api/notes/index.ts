@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -23,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'POST') {
-      const { customer_id, title } = req.body;
+      const { customer_id, title, project_id } = req.body;
       // De notitie komt als HTML uit de teksteditor; alleen de toegestane opmaak blijft
       const content = sanitizeRichText(String(req.body.content || ''));
 
@@ -36,6 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         customer_id: parseInt(customer_id),
         title,
         content,
+        project_id: projectIdFromBody(project_id) ?? null,
       });
 
       return res.status(201).json(note);

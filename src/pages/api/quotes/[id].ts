@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -37,6 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         notes,
         blocks,
         autosave,
+        project_id,
       } = req.body;
 
       const updates: any = {};
@@ -48,6 +50,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (currency !== undefined) updates.currency = currency;
       if (intro_text !== undefined) updates.intro_text = intro_text;
       if (notes !== undefined) updates.notes = notes;
+      if (project_id !== undefined) updates.project_id = projectIdFromBody(project_id);
 
       // Het totaal wordt hier herrekend zodat het altijd bij de blokken past
       if (blocks !== undefined) {

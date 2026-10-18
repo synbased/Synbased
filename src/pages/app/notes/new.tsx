@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Layout from '@/components/Layout';
 import { useToast } from '@/components/Toast';
 import NoteFields, { validateNote } from '@/components/NoteFields';
@@ -10,9 +11,11 @@ import { getCustomerOptionLabel } from '@/lib/utils';
 export default function NewNote() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [formData, setFormData] = useState({
     customer_id: '',
+    project_id: '',
     title: '',
     content: '',
   });
@@ -22,9 +25,13 @@ export default function NewNote() {
 
   // Check if customer_id was passed via query params
   useEffect(() => {
-    const { customer_id } = router.query;
+    const { customer_id, project_id } = router.query;
     if (customer_id && typeof customer_id === 'string') {
       setFormData(prev => ({ ...prev, customer_id }));
+    }
+    // Vanuit een project staat dat project al goed
+    if (project_id && typeof project_id === 'string') {
+      setFormData(prev => ({ ...prev, project_id }));
     }
   }, [router.query]);
 
@@ -112,6 +119,7 @@ export default function NewNote() {
             formData={formData}
             onChange={setFormData}
             customerOptions={customerOptions}
+            projectOptions={projectOptions}
             errors={showErrors ? validateNote(formData) : {}}
           />
         </form>

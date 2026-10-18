@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -25,13 +26,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT' || req.method === 'PATCH') {
-      const { title, content, customer_id } = req.body;
+      const { title, content, customer_id, project_id } = req.body;
 
       const updates: any = {};
       if (title !== undefined) updates.title = title;
       // De notitie komt als HTML uit de teksteditor; alleen de toegestane opmaak blijft
       if (content !== undefined) updates.content = sanitizeRichText(String(content));
       if (customer_id !== undefined) updates.customer_id = parseInt(customer_id);
+      if (project_id !== undefined) updates.project_id = projectIdFromBody(project_id);
 
       const note = await updateNote(id, tenantId, updates);
       return res.status(200).json(note);

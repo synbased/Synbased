@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Layout from '@/components/Layout';
 import { useToast } from '@/components/Toast';
 import { useConfirm } from '@/hooks/useConfirm';
@@ -20,6 +21,7 @@ import type { Expense } from '@/lib/supabase';
 export default function EditExpense() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const { id } = router.query;
   const { confirm } = useConfirm();
   const aiAccount = useAiAccount();
@@ -45,6 +47,7 @@ export default function EditExpense() {
           due_date: expense.due_date || '',
           description: expense.description || '',
           category: expense.category,
+          project_id: expense.project_id ? String(expense.project_id) : '',
           status: expense.status,
           paid_at: expense.paid_at || '',
           lines: (expense.lines || []).length
@@ -187,6 +190,7 @@ export default function EditExpense() {
             }}
             scanning={scanning}
             hasAi={!!aiAccount}
+            projectOptions={projectOptions}
             errors={showErrors ? validateExpense(formData) : {}}
           />
         </form>

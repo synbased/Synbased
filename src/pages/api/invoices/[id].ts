@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -27,6 +28,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
+      // Alleen het project: dat mag ook bij een factuur die al vastligt
+      if (Object.keys(req.body || {}).length === 1 && 'project_id' in req.body) {
+        const invoice = await updateInvoice(id, tenantId, { project_id: projectIdFromBody(req.body.project_id) });
+        return res.status(200).json(invoice);
+      }
+
       // Verstuurd is vast: alleen de status verandert nog, via versturen en betaald
       const current = await getInvoice(id, tenantId);
       if (isFinalInvoice(current)) {
@@ -42,6 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         intro_text,
         notes,
         blocks,
+        project_id,
       } = req.body;
 
       const updates: any = {};
@@ -60,6 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (currency !== undefined) updates.currency = currency;
       if (intro_text !== undefined) updates.intro_text = intro_text;
       if (notes !== undefined) updates.notes = notes;
+      if (project_id !== undefined) updates.project_id = projectIdFromBody(project_id);
 
       // Het totaal wordt hier herrekend zodat het altijd bij de blokken past
       if (blocks !== undefined) {

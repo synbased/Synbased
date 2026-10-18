@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import Select from '@/components/Select';
+import Select, { type SelectOption } from '@/components/Select';
 import DatePicker from '@/components/DatePicker';
 import FileUpload from '@/components/FileUpload';
 import Toggle from '@/components/Toggle';
@@ -31,6 +31,8 @@ export interface ExpenseFormData {
   due_date: string;
   description: string;
   category: string;
+  /** Leeg als de kosten niet bij een project horen */
+  project_id: string;
   status: 'open' | 'paid';
   paid_at: string;
   lines: ExpenseLineForm[];
@@ -114,6 +116,7 @@ export default function ExpenseFields({
   onFileRemove,
   scanning = false,
   hasAi,
+  projectOptions = [],
   errors = {},
 }: {
   formData: ExpenseFormData;
@@ -125,6 +128,7 @@ export default function ExpenseFields({
   onFileRemove: () => void;
   scanning?: boolean;
   hasAi: boolean;
+  projectOptions?: SelectOption[];
   errors?: ExpenseErrors;
 }) {
   const setLine = (index: number, changes: Partial<ExpenseLineForm>) => {
@@ -240,6 +244,22 @@ export default function ExpenseFields({
             value={categoryOptions.find(o => o.value === formData.category) || null}
             onChange={(option) => onChange({ ...formData, category: option?.value || 'other' })}
             options={categoryOptions}
+          />
+        </div>
+      </div>
+
+      <div className="row-section">
+        <div className="information">
+          <span className="title">Project</span>
+          <span className="description">Optioneel: de klus waar deze kosten bij horen, voor de marge per project.</span>
+        </div>
+        <div>
+          <Select
+            value={projectOptions.find(o => o.value === formData.project_id) || null}
+            onChange={(option) => onChange({ ...formData, project_id: option?.value || '' })}
+            options={projectOptions}
+            placeholder="Geen project"
+            isClearable
           />
         </div>
       </div>

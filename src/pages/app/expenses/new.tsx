@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Layout from '@/components/Layout';
 import { useToast } from '@/components/Toast';
 import { useAiAccount } from '@/hooks/useAiAccount';
@@ -18,6 +19,7 @@ import { vandaag } from '@/lib/utils';
 export default function NewExpense() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const aiAccount = useAiAccount();
   const [formData, setFormData] = useState<ExpenseFormData>({
     supplier: '',
@@ -26,11 +28,19 @@ export default function NewExpense() {
     due_date: '',
     description: '',
     category: 'materials',
+    // Vanuit een project staat dat project al goed
+    project_id: '',
     status: 'open',
     paid_at: '',
     lines: [{ ...EMPTY_LINE }],
   });
   const [file, setFile] = useState<ExpenseFile | null>(null);
+
+  useEffect(() => {
+    if (typeof router.query.project_id === 'string') {
+      setFormData(prev => ({ ...prev, project_id: router.query.project_id as string }));
+    }
+  }, [router.query.project_id]);
   const [scanning, setScanning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   // Pas na de eerste keer opslaan tonen wat er ontbreekt, niet al bij het openen
@@ -121,6 +131,7 @@ export default function NewExpense() {
             onFileRemove={() => setFile(null)}
             scanning={scanning}
             hasAi={!!aiAccount}
+            projectOptions={projectOptions}
             errors={showErrors ? validateExpense(formData) : {}}
           />
         </form>

@@ -714,6 +714,46 @@ ALTER TABLE quote_elements ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAU
 ALTER TABLE invoice_elements ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAULT 'normal';
 ALTER TABLE expense_lines ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAULT 'normal';
 
+-- ------------------------------------------------------------
+-- 22. Projecten
+--
+-- Een project is een klus, zoals "Badkamer Familie Verhoef". Offertes,
+-- facturen, kosten en notities kunnen erbij horen, zodat je per klus ziet wat
+-- er geoffreerd, gefactureerd en uitgegeven is.
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS projects (
+  id BIGSERIAL PRIMARY KEY,
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('quote', 'planned', 'active', 'completed')),
+  -- Het adres van de klus, als dat een ander is dan dat van de klant
+  address TEXT,
+  start_date DATE,
+  end_date DATE,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS projects_tenant_id_idx ON projects(tenant_id);
+
+DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
+CREATE TRIGGER update_projects_updated_at
+  BEFORE UPDATE ON projects
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS quotes_project_id_idx ON quotes(project_id);
+CREATE INDEX IF NOT EXISTS invoices_project_id_idx ON invoices(project_id);
+CREATE INDEX IF NOT EXISTS expenses_project_id_idx ON expenses(project_id);
+CREATE INDEX IF NOT EXISTS notes_project_id_idx ON notes(project_id);
+
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+
 -- De rechten opnieuw, zodat de nieuwe tabellen ze ook hebben
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
@@ -728,7 +768,7 @@ NOTIFY pgrst, 'reload schema';
 -- Controle achteraf
 --
 -- Eén opdracht, want de SQL-editor toont alleen de uitkomst van de laatste.
--- Er horen tweeëntwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
+-- Er horen drieëntwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
 -- ergens NEE, dan is dat onderdeel niet gelukt.
 -- ------------------------------------------------------------
 SELECT 'Elementtypes offerte' AS controle,
@@ -883,4 +923,12 @@ UNION ALL SELECT 'Btw verlegd en buitenland',
          SELECT count(*) FROM information_schema.columns
          WHERE table_schema = 'public' AND table_name IN ('quote_elements', 'invoice_elements', 'expense_lines')
            AND column_name = 'vat_type'
-       ) = 3 THEN 'ja' ELSE 'NEE - onderdeel 21 niet gelukt' END;
+       ) = 3 THEN 'ja' ELSE 'NEE - onderdeel 21 niet gelukt' END
+
+UNION ALL SELECT 'Projecten',
+       CASE WHEN EXISTS (
+         SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'projects'
+       ) AND (
+         SELECT count(*) FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name IN ('quotes', 'invoices', 'expenses', 'notes') AND column_name = 'project_id'
+       ) = 4 THEN 'ja' ELSE 'NEE - onderdeel 22 niet gelukt' END;

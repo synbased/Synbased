@@ -4,6 +4,8 @@ import { isRichTextEmpty } from '@/lib/richtext';
 
 export interface NoteFormData {
   customer_id: string;
+  /** Leeg als de notitie niet bij een project hoort */
+  project_id: string;
   title: string;
   /** De notitie als HTML uit de teksteditor */
   content: string;
@@ -29,11 +31,13 @@ export default function NoteFields({
   formData,
   onChange,
   customerOptions,
+  projectOptions = [],
   errors = {},
 }: {
   formData: NoteFormData;
   onChange: (formData: NoteFormData) => void;
   customerOptions: SelectOption[];
+  projectOptions?: SelectOption[];
   errors?: NoteErrors;
 }) {
   return (
@@ -51,6 +55,22 @@ export default function NoteFields({
             placeholder="Selecteer een klant"
           />
           {errors.customer_id && <p className="field-error">{errors.customer_id}</p>}
+        </div>
+      </div>
+
+      <div className="row-section">
+        <div className="information">
+          <span className="title">Project</span>
+          <span className="description">Optioneel: de klus waar de notitie bij hoort.</span>
+        </div>
+        <div>
+          <Select
+            value={projectOptions.find(o => o.value === formData.project_id) || null}
+            onChange={(option) => onChange({ ...formData, project_id: option?.value || '' })}
+            options={projectOptions}
+            placeholder="Geen project"
+            isClearable
+          />
         </div>
       </div>
 

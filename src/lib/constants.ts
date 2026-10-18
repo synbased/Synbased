@@ -39,6 +39,14 @@ export const INVOICE_STATUS: Record<string, { label: string; className: string }
   cancelled: { label: 'Geannuleerd', className: 'status-cancelled' },
 };
 
+/** De fases van een project, met hun naam en hun kleur in de lijst */
+export const PROJECT_STATUS: Record<string, { label: string; className: string }> = {
+  quote: { label: 'Offerte', className: 'status-draft' },
+  planned: { label: 'Gepland', className: 'status-draft' },
+  active: { label: 'In uitvoering', className: 'status-sent' },
+  completed: { label: 'Opgeleverd', className: 'status-paid' },
+};
+
 /** De statussen van een kostenpost */
 export const EXPENSE_STATUS: Record<string, { label: string; className: string }> = {
   open: { label: 'Open', className: 'status-sent' },

@@ -1,3 +1,4 @@
+import { projectIdFromBody } from '@/lib/projects';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
@@ -29,6 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         intro_text,
         notes,
         blocks,
+        project_id,
       } = req.body;
 
       if (!customer_id) {
@@ -49,6 +51,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           currency: currency || 'EUR',
           intro_text: intro_text || null,
           notes: notes || null,
+          project_id: projectIdFromBody(project_id) ?? null,
           total: calculateDocumentTotal(blocks),
           // Altijd eerst een concept; vast komt hij pas bij versturen of betaald
           status: 'draft',

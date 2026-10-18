@@ -1,6 +1,7 @@
 import HelpButton from '@/components/HelpButton';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { useProjects } from '@/hooks/useProjects';
 import Link from 'next/link';
 import { Undo2, Redo2 } from 'lucide-react';
 import Layout from '@/components/Layout';
@@ -43,6 +44,7 @@ const FINAL_NOTE = 'Hij krijgt dan zijn nummer en is daarna niet meer te wijzige
 export default function EditInvoice() {
   const toast = useToast();
   const router = useRouter();
+  const projectOptions = useProjects();
   const { id } = router.query;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -64,6 +66,7 @@ export default function EditInvoice() {
     invoice_date: vandaag(),
     due_date: overDagen(30),
     customer_id: '',
+    project_id: '',
     currency: 'EUR',
     status: 'draft',
     blocks: [] as DocumentBlock[],
@@ -104,6 +107,7 @@ export default function EditInvoice() {
         invoice_date: invoice.invoice_date || vandaag(),
         due_date: invoice.due_date || vandaag(),
         customer_id: String(invoice.customer_id),
+        project_id: invoice.project_id ? String(invoice.project_id) : '',
         currency: invoice.currency || 'EUR',
         status: invoice.status,
         blocks: copyBlocks(invoice.blocks),
@@ -159,6 +163,7 @@ export default function EditInvoice() {
           invoice_date: formData.invoice_date,
           due_date: creditFor ? null : formData.due_date,
           customer_id: formData.customer_id,
+          project_id: formData.project_id || null,
           status,
           currency: formData.currency,
           intro_text: formData.intro_text || null,
@@ -448,6 +453,18 @@ export default function EditInvoice() {
                     onChange={(option) => setFormData({ ...formData, customer_id: option?.value || '' })}
                     options={customerOptions}
                     placeholder="Selecteer een klant"
+                  />
+                </div>
+              </div>
+              <div className="form-section">
+                <div className="form-group">
+                  <label>Project</label>
+                  <Select
+                    value={projectOptions.find(o => o.value === formData.project_id) || null}
+                    onChange={(option) => setFormData({ ...formData, project_id: option?.value || '' })}
+                    options={projectOptions}
+                    placeholder="Geen project"
+                    isClearable
                   />
                 </div>
               </div>

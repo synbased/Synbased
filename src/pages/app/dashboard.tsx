@@ -7,6 +7,7 @@ import Table from '@/components/Table';
 import RevenueChart from '@/components/RevenueChart';
 import { Skeleton } from '@/components/Skeleton';
 import { QUOTE_STATUS } from '@/lib/constants';
+import { isCreditNote } from '@/lib/invoices';
 import { formatCurrency, formatDate, getCustomerDisplayName } from '@/lib/utils';
 import type { Customer } from '@/lib/supabase';
 
@@ -25,6 +26,7 @@ interface Quote extends Document {
 interface Invoice extends Document {
   invoice_number: string | null;
   due_date: string | null;
+  credit_for_invoice_id: number | null;
 }
 
 /** Zoveel regels per tabel; de rest staat bij Offertes en Facturen */
@@ -83,10 +85,9 @@ export default function Dashboard() {
   const openQuotes = quotes
     .filter((quote) => quote.status === 'draft' || quote.status === 'sent')
     .sort(byDate((quote: Quote) => quote.valid_until));
-  const openInvoices = invoices
-    .filter((invoice) => invoice.status === 'draft' || invoice.status === 'sent')
-    .sort(byDate((invoice: Invoice) => invoice.due_date));
-  const sentInvoices = invoices.filter((invoice) => invoice.status === 'sent');
+  // Wat de klant nog moet betalen: verstuurd, zonder concepten en creditfacturen
+  const sentInvoices = invoices.filter((invoice) => invoice.status === 'sent' && !isCreditNote(invoice));
+  const openInvoices = [...sentInvoices].sort(byDate((invoice: Invoice) => invoice.due_date));
   const overdueInvoices = sentInvoices.filter(isOverdue);
 
   // Van de offertes waar een besluit over is: hoeveel zijn er goedgekeurd

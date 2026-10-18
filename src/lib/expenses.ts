@@ -1,3 +1,4 @@
+import { formatCurrency } from './utils';
 import { EXPENSE_CATEGORIES, PURCHASE_VAT_TYPES, VAT_RATES } from './constants';
 import type { ReceiptReading } from './ai/types';
 import type { ExpenseLine } from './supabase';
@@ -105,6 +106,20 @@ export function expenseFromBody(body: any): {
     .filter((line: ExpenseLine) => line.amount_excl !== 0 || line.vat_amount !== 0);
 
   if (lines.length === 0) return { fields, problem: 'Vul een bedrag in' };
+
+  // De btw moet bij het tarief passen. Op een bon met veel artikelen kan de
+  // afronding wat schelen, dus een paar procent marge; een tikfout valt op
+  const wrongVat = lines.find(line => {
+    if (line.vat_type !== 'normal') return false;
+    const expected = vatFor(line.amount_excl, line.vat_rate);
+    return Math.abs(line.vat_amount - expected) > Math.max(0.1, Math.abs(expected) * 0.02);
+  });
+  if (wrongVat) {
+    return {
+      fields,
+      problem: `De btw van ${wrongVat.description ? `"${wrongVat.description}"` : 'een regel'} past niet bij ${wrongVat.vat_rate}%: dat is ongeveer ${formatCurrency(vatFor(wrongVat.amount_excl, wrongVat.vat_rate))}`,
+    };
+  }
 
   return { fields, lines };
 }

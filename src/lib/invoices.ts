@@ -39,8 +39,8 @@ export const FINAL_INVOICE_ERROR =
   'Deze factuur is verstuurd en kan niet meer gewijzigd worden. Maak een creditfactuur om hem te corrigeren.';
 
 /**
- * De gegevens rechtsboven op het document. Een creditfactuur noemt de factuur
- * die hij corrigeert, en heeft geen vervaldatum.
+ * De gegevens rechtsboven op het document. Een creditfactuur heet ook zo, noemt
+ * de factuur die hij corrigeert, en heeft geen vervaldatum.
  */
 export function invoiceMeta(
   invoice: { invoice_number?: string | null; invoice_date?: string | null; due_date?: string | null },
@@ -48,7 +48,7 @@ export function invoiceMeta(
 ): { label: string; value: string }[] {
   return [
     // Een concept krijgt zijn nummer pas bij het vastleggen
-    { label: 'Factuurnummer', value: invoice.invoice_number || 'Volgt bij versturen' },
+    { label: creditFor ? 'Creditfactuurnummer' : 'Factuurnummer', value: invoice.invoice_number || 'Volgt bij versturen' },
     ...(creditFor ? [{ label: 'Bij factuur', value: creditFor.invoice_number || '' }] : []),
     { label: 'Factuurdatum', value: formatDate(invoice.invoice_date) },
     ...(creditFor ? [] : [{ label: 'Vervaldatum', value: formatDate(invoice.due_date) }]),

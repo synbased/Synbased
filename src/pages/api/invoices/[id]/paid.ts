@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { updateInvoice } from '@/lib/db';
 import { releaseSettlement } from '@/lib/bank';
+import { errorStatus } from '@/lib/utils';
 
 /**
  * Een factuur als betaald markeren, of dat terugdraaien: POST { paid }.
@@ -28,6 +29,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(updated);
   } catch (error: any) {
     console.error('Mark paid error:', error);
-    return res.status(500).json({ error: error.message || 'Er is iets misgegaan' });
+    return res.status(errorStatus(error)).json({ error: error.message || 'Er is iets misgegaan' });
   }
 }

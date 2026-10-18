@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getNotes, createNote } from '@/lib/db';
 import { isRichTextEmpty, sanitizeRichText } from '@/lib/richtext';
+import { errorStatus } from '@/lib/utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -46,6 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     console.error('API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(errorStatus(error)).json({ error: error.message || 'Internal server error' });
   }
 }

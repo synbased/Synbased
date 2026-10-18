@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { createExpense, getExpenses } from '@/lib/db';
 import { expenseFromBody } from '@/lib/expenses';
+import { errorStatus } from '@/lib/utils';
 
 // Het bonnetje komt als data-URL mee; groter dan de standaardgrens van 1 MB
 export const config = {
@@ -33,6 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     console.error('API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(errorStatus(error)).json({ error: error.message || 'Internal server error' });
   }
 }

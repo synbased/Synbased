@@ -4,6 +4,7 @@ import { authOptions } from '../auth/[...nextauth]';
 import { deleteExpense, getExpense, updateExpense } from '@/lib/db';
 import { expenseFromBody } from '@/lib/expenses';
 import { projectIdFromBody } from '@/lib/projects';
+import { errorStatus } from '@/lib/utils';
 
 export const config = {
   api: {
@@ -47,6 +48,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: any) {
     console.error('API error:', error);
-    return res.status(500).json({ error: error.message || 'Internal server error' });
+    return res.status(errorStatus(error)).json({ error: error.message || 'Internal server error' });
   }
 }

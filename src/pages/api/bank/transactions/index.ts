@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { getBankTransactions } from '@/lib/bank';
+import { errorStatus } from '@/lib/utils';
 
 /** De banktransacties, nieuwste eerst: GET, of ?open=1 voor alleen wat nog te verwerken is */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -14,6 +15,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json(await getBankTransactions((session.user as any).tenantId, req.query.open === '1'));
   } catch (error: any) {
     console.error('Bank transactions error:', error);
-    return res.status(500).json({ error: error.message || 'Er is iets misgegaan' });
+    return res.status(errorStatus(error)).json({ error: error.message || 'Er is iets misgegaan' });
   }
 }

@@ -34,8 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           startDate.setMonth(now.getMonth() - 1);
           break;
         case 'year':
-          startDate = new Date(now);
-          startDate.setFullYear(now.getFullYear() - 1);
+          // Vanaf de eerste van de maand, elf maanden terug: twaalf maanden in
+          // de grafiek, zonder dat dezelfde maand van vorig jaar erbij telt
+          startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
           break;
         default:
           startDate = new Date(now);
@@ -137,8 +138,8 @@ function fillMissingDates(
   } else if (period === 'year') {
     // Fill last 12 months
     for (let i = 11; i >= 0; i--) {
-      const date = new Date(endDate);
-      date.setMonth(endDate.getMonth() - i);
+      // Op de eerste van de maand; de 31e van een kortere maand schuift anders door
+      const date = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
       keys.push(date.toLocaleDateString('nl-NL', { month: 'short' }));
     }
   }

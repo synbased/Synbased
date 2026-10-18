@@ -1055,7 +1055,11 @@ export async function deleteQuote(id: string | number, tenantId: string) {
  * bewijs, dus er gaat niet meer mee dan die pagina nodig heeft. De tenant komt
  * apart mee voor het logo en het sjabloon.
  */
+/** Een link-sleutel is een UUID; iets anders bestaat niet, en de database zou erover vallen */
+const isToken = (token: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token);
+
 export async function getQuoteByToken(token: string) {
+  if (!isToken(token)) return null;
   const { data, error } = await supabase
     .from('quotes')
     .select(
@@ -1083,6 +1087,7 @@ export async function getQuoteByToken(token: string) {
  * bekijkt en betaalt. Zonder sessie, dus alleen wat die pagina nodig heeft.
  */
 export async function getInvoiceByToken(token: string) {
+  if (!isToken(token)) return null;
   const { data, error } = await supabase
     .from('invoices')
     .select(
@@ -1151,6 +1156,7 @@ export async function recordQuoteView(id: number, viewCount: number, viewedAt: s
  * getekend worden; daarna staat hij op goedgekeurd.
  */
 export async function signQuote(token: string, name: string, signatureImage: string) {
+  if (!isToken(token)) return null;
   const { data: existing, error: lookupError } = await supabase
     .from('quotes')
     .select('id, signed_at')

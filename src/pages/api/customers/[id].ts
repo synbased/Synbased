@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
 import { getCustomer, updateCustomer, deleteCustomer } from '@/lib/db';
+import { errorStatus } from '@/lib/utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -76,6 +77,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('API error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return res.status(500).json({ error: errorMessage });
+    return res.status(errorStatus(error)).json({ error: errorMessage });
   }
 }

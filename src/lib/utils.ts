@@ -157,3 +157,15 @@ export function overDagen(aantal: number): string {
   datum.setDate(datum.getDate() + aantal);
   return datumNaarTekst(datum);
 }
+
+/**
+ * De HTTP-status bij een fout in een API-route. Wat niet bestaat (of van een
+ * ander bedrijf is) is 404; een melding die we zelf gooien, zoals "Vul de
+ * factuurdatum in", is 400; een fout van de database of iets onverwachts 500.
+ */
+export function errorStatus(error: any): number {
+  const code = error?.code;
+  if (typeof error?.status === 'number') return error.status;
+  if (code === 'PGRST116' || /niet gevonden|not found/i.test(error?.message || '')) return 404;
+  return error?.constructor === Error && !code ? 400 : 500;
+}

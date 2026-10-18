@@ -14,6 +14,7 @@ interface PrintInvoice {
   invoice_date: string | null;
   due_date: string | null;
   currency: string;
+  status: string;
   blocks: DocumentBlock[];
   customer: Partial<Customer> | null;
   credit_for_invoice_id: number | null;
@@ -87,7 +88,8 @@ export default function PrintInvoice() {
               blocks={invoice.blocks}
               currency={invoice.currency}
               tenant={tenant}
-              payment={isCreditNote(invoice) ? null : { reference: invoiceReference(invoice), dueDate: invoice.due_date }}
+              // Betaald of een creditfactuur: er valt niets te betalen
+              payment={isCreditNote(invoice) || invoice.status === 'paid' ? null : { reference: invoiceReference(invoice), dueDate: invoice.due_date }}
               papier="vol"
             />
           </>

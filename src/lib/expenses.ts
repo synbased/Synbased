@@ -1,4 +1,4 @@
-import { EXPENSE_CATEGORIES, VAT_RATES } from './constants';
+import { EXPENSE_CATEGORIES, PURCHASE_VAT_TYPES, VAT_RATES } from './constants';
 import type { ExpenseLine } from './supabase';
 
 /**
@@ -6,7 +6,9 @@ import type { ExpenseLine } from './supabase';
  *
  * Een kostenpost heeft een of meer regels, elk met een eigen btw-tarief, zoals
  * ze onderaan een bonnetje staan. De bedragen van de kostenpost zelf zijn
- * altijd de som van de regels.
+ * altijd de som van de regels. Een regel kan ook verlegde btw hebben (zie
+ * PURCHASE_VAT_TYPES): dan betaal je de leverancier geen btw, maar geef je
+ * hem zelf aan.
  */
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -57,6 +59,7 @@ export function expenseFromBody(body: any): {
       amount_excl: cents(Number(line?.amount_excl) || 0),
       vat_rate: (VAT_RATES as readonly number[]).includes(Number(line?.vat_rate)) ? Number(line.vat_rate) : 21,
       vat_amount: cents(Number(line?.vat_amount) || 0),
+      vat_type: line?.vat_type in PURCHASE_VAT_TYPES ? line.vat_type : 'normal',
     }))
     .filter((line: ExpenseLine) => line.amount_excl !== 0 || line.vat_amount !== 0);
 

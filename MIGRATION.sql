@@ -701,6 +701,19 @@ CREATE INDEX IF NOT EXISTS bank_connections_tenant_id_idx ON bank_connections(te
 
 ALTER TABLE bank_connections ENABLE ROW LEVEL SECURITY;
 
+-- ------------------------------------------------------------
+-- 21. Btw verlegd en het buitenland
+--
+-- Per prijstabel van een offerte of factuur, en per regel van een
+-- kostenpost, de soort btw: gewoon ('normal'), verlegd binnen Nederland
+-- ('reverse_charge'), binnen de EU ('eu'), of export buiten de EU ('export',
+-- verkoop) en invoer van buiten de EU ('import', inkoop). Bestaande regels
+-- zijn gewoon; daarvoor verandert er niets.
+-- ------------------------------------------------------------
+ALTER TABLE quote_elements ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE invoice_elements ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE expense_lines ADD COLUMN IF NOT EXISTS vat_type TEXT NOT NULL DEFAULT 'normal';
+
 -- De rechten opnieuw, zodat de nieuwe tabellen ze ook hebben
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
@@ -715,7 +728,7 @@ NOTIFY pgrst, 'reload schema';
 -- Controle achteraf
 --
 -- Eén opdracht, want de SQL-editor toont alleen de uitkomst van de laatste.
--- Er horen eenentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
+-- Er horen tweeëntwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
 -- ergens NEE, dan is dat onderdeel niet gelukt.
 -- ------------------------------------------------------------
 SELECT 'Elementtypes offerte' AS controle,
@@ -863,4 +876,11 @@ UNION ALL SELECT 'Bankkoppeling',
        CASE WHEN EXISTS (
          SELECT 1 FROM information_schema.tables
          WHERE table_schema = 'public' AND table_name = 'bank_connections'
-       ) THEN 'ja' ELSE 'NEE - onderdeel 20 niet gelukt' END;
+       ) THEN 'ja' ELSE 'NEE - onderdeel 20 niet gelukt' END
+
+UNION ALL SELECT 'Btw verlegd en buitenland',
+       CASE WHEN (
+         SELECT count(*) FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name IN ('quote_elements', 'invoice_elements', 'expense_lines')
+           AND column_name = 'vat_type'
+       ) = 3 THEN 'ja' ELSE 'NEE - onderdeel 21 niet gelukt' END;

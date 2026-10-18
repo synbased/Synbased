@@ -97,6 +97,8 @@ export const ReceiptReadingSchema = z.object({
       amount_excl: z.number(),
       vat_rate: z.number(),
       vat_amount: z.number(),
+      /** normal, of reverse_charge / eu / import als de btw naar de koper verlegd is */
+      vat_type: z.enum(['normal', 'reverse_charge', 'eu', 'import']),
     })
   ),
   /** Of het al betaald is, zoals bij een kassabon of "voldaan" */

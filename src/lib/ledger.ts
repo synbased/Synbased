@@ -14,7 +14,8 @@ import { categoryLabel, isVatDeductible } from './expenses';
  *   debiteuren; de uitbetaling van Mollie op de bank (categorie
  *   "overboeking") boekt bank aan kruisposten.
  * - Een kostenpost: kosten en voorbelasting aan crediteuren. Niet
- *   aftrekbare btw (eten en drinken) hoort bij de kosten.
+ *   aftrekbare btw (eten en drinken) hoort bij de kosten. Verlegde btw:
+ *   voorbelasting aan te betalen btw, dus per saldo nul.
  * - Betaald: crediteuren aan bank.
  * - Een banktransactie met een categorie: bank tegen die rekening, zoals
  *   privé of bankkosten. Een transactie die nog niet verwerkt is staat op
@@ -50,6 +51,9 @@ const ALL_ACCOUNTS: LedgerAccount[] = [
   { code: '8010', name: 'Omzet laag tarief (9%)', type: 'revenue' },
   { code: '8020', name: 'Omzet 0% of niet bij u belast', type: 'revenue' },
   { code: '8030', name: 'Omzet overige tarieven', type: 'revenue' },
+  { code: '8040', name: 'Omzet btw verlegd', type: 'revenue' },
+  { code: '8050', name: 'Omzet binnen de EU', type: 'revenue' },
+  { code: '8060', name: 'Omzet export buiten de EU', type: 'revenue' },
   { code: '8900', name: 'Overige inkomsten', type: 'revenue' },
 ];
 
@@ -69,7 +73,10 @@ export interface JournalLine {
 
 const cents = (amount: number) => Math.round(amount * 100) / 100;
 
-const revenueAccount = (rate: number) => (rate === 21 ? '8000' : rate === 9 ? '8010' : rate === 0 ? '8020' : '8030');
+/** De omzetrekening bij een tarief, of bij verlegd, EU en export een eigen rekening */
+const revenueAccount = (rate: number, type: string) =>
+  type === 'reverse_charge' ? '8040' : type === 'eu' ? '8050' : type === 'export' ? '8060'
+    : rate === 21 ? '8000' : rate === 9 ? '8010' : rate === 0 ? '8020' : '8030';
 const expenseAccount = (category: string) => EXPENSE_CATEGORIES.find(c => c.value === category)?.account || '4990';
 const bankCategoryAccount = (category: string) => BANK_CATEGORIES.find(c => c.value === category)?.account || '2300';
 
@@ -97,7 +104,7 @@ export async function buildJournal(tenantId: string, to: string): Promise<Journa
   for (const invoice of invoices) {
     const source = `${invoice.credit_for_invoice_id ? 'Creditfactuur' : 'Factuur'} ${invoice.invoice_number || ''}`.trim();
     for (const rate of invoice.rates) {
-      post(lines, invoice.invoice_date, source, `Omzet ${rate.rate}%`, '1300', revenueAccount(rate.rate), rate.base);
+      post(lines, invoice.invoice_date, source, rate.type === 'normal' ? `Omzet ${rate.rate}%` : 'Omzet zonder btw', '1300', revenueAccount(rate.rate, rate.type), rate.base);
       post(lines, invoice.invoice_date, source, `Btw ${rate.rate}%`, '1300', '1500', rate.vat);
     }
 
@@ -110,10 +117,16 @@ export async function buildJournal(tenantId: string, to: string): Promise<Journa
 
   for (const expense of expenses) {
     const source = `Kosten ${expense.supplier}`;
-    const nonDeductible = cents(expense.vat_amount - expense.deductible);
+    const nonDeductible = cents(expense.vat_amount - expense.paidDeductible);
     post(lines, expense.expense_date, source, categoryLabel(expense.category), expenseAccount(expense.category), '1600', expense.total_excl + nonDeductible);
     if (isVatDeductible(expense.category)) {
-      post(lines, expense.expense_date, source, 'Voorbelasting', '1510', '1600', expense.deductible);
+      post(lines, expense.expense_date, source, 'Voorbelasting', '1510', '1600', expense.paidDeductible);
+    }
+    // Verlegde btw: je geeft hem zelf aan (te betalen) en trekt hem weer af
+    // (voorbelasting); mag dat niet, dan is het kosten
+    for (const self of expense.selfAssessed) {
+      const debit = isVatDeductible(expense.category) ? '1510' : expenseAccount(expense.category);
+      post(lines, expense.expense_date, source, 'Verlegde btw', debit, '1500', self.vat);
     }
 
     const paidOn = expense.status === 'paid' && expense.paid_at ? expense.paid_at.slice(0, 10) : null;

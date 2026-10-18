@@ -53,6 +53,7 @@ export default function EditExpense() {
                 amount_excl: Number(line.amount_excl).toFixed(2),
                 vat_rate: String(Number(line.vat_rate)),
                 vat_amount: Number(line.vat_amount).toFixed(2),
+                vat_type: line.vat_type || 'normal',
               }))
             : [{ ...EMPTY_LINE }],
         });

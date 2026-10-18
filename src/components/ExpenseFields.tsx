@@ -3,12 +3,16 @@ import Select from '@/components/Select';
 import DatePicker from '@/components/DatePicker';
 import FileUpload from '@/components/FileUpload';
 import Toggle from '@/components/Toggle';
-import { EXPENSE_CATEGORIES, VAT_RATES } from '@/lib/constants';
+import { EXPENSE_CATEGORIES, PURCHASE_VAT_TYPES, VAT_RATES } from '@/lib/constants';
 import { isVatDeductible, vatFor } from '@/lib/expenses';
 import { formatCurrency } from '@/lib/utils';
 
 const categoryOptions = EXPENSE_CATEGORIES.map(c => ({ value: c.value, label: c.label }));
-const rateOptions = VAT_RATES.map(rate => ({ value: String(rate), label: `${rate}%` }));
+// Gewone tarieven, en daaronder inkoop waarbij je de btw zelf aangeeft
+const rateOptions = [
+  ...VAT_RATES.map(rate => ({ value: String(rate), label: `${rate}%` })),
+  ...Object.entries(PURCHASE_VAT_TYPES).map(([value, { label }]) => ({ value, label })),
+];
 
 /** Een regel zoals hij in het formulier staat: bedragen als tekst, zodat je vrij kunt typen */
 export interface ExpenseLineForm {
@@ -16,6 +20,8 @@ export interface ExpenseLineForm {
   amount_excl: string;
   vat_rate: string;
   vat_amount: string;
+  /** Gewoon, of verlegd / EU / buiten de EU: dan geef je de btw zelf aan (21%) */
+  vat_type: string;
 }
 
 export interface ExpenseFormData {
@@ -40,7 +46,7 @@ export interface ExpenseFile {
 
 export type ExpenseErrors = Partial<Record<'supplier' | 'expense_date' | 'lines', string>>;
 
-export const EMPTY_LINE: ExpenseLineForm = { description: '', amount_excl: '', vat_rate: '21', vat_amount: '' };
+export const EMPTY_LINE: ExpenseLineForm = { description: '', amount_excl: '', vat_rate: '21', vat_amount: '', vat_type: 'normal' };
 
 /** Wat er nog ontbreekt; leeg als de kostenpost opgeslagen kan worden */
 export function validateExpense(formData: ExpenseFormData): ExpenseErrors {
@@ -58,6 +64,7 @@ export function linesForSave(lines: ExpenseLineForm[]) {
     amount_excl: Number(line.amount_excl) || 0,
     vat_rate: Number(line.vat_rate) || 0,
     vat_amount: Number(line.vat_amount) || 0,
+    vat_type: line.vat_type || 'normal',
   }));
 }
 
@@ -125,7 +132,7 @@ export default function ExpenseFields({
       if (i !== index) return line;
       const next = { ...line, ...changes };
       // Een nieuw bedrag of tarief rekent de btw opnieuw uit; de btw zelf blijft aan te passen
-      if (changes.amount_excl !== undefined || changes.vat_rate !== undefined) {
+      if (changes.amount_excl !== undefined || changes.vat_rate !== undefined || changes.vat_type !== undefined) {
         next.vat_amount = next.amount_excl === '' ? '' : vatFor(Number(next.amount_excl), Number(next.vat_rate)).toFixed(2);
       }
       return next;
@@ -134,7 +141,11 @@ export default function ExpenseFields({
   };
 
   const totalExcl = formData.lines.reduce((sum, line) => sum + (Number(line.amount_excl) || 0), 0);
-  const totalVat = formData.lines.reduce((sum, line) => sum + (Number(line.vat_amount) || 0), 0);
+  // Alleen gewone btw betaal je de leverancier; verlegde btw geef je zelf aan
+  const totalVat = formData.lines
+    .filter(line => line.vat_type === 'normal')
+    .reduce((sum, line) => sum + (Number(line.vat_amount) || 0), 0);
+  const selfAssessed = formData.lines.some(line => line.vat_type !== 'normal');
 
   return (
     <>
@@ -255,6 +266,7 @@ export default function ExpenseFields({
           <span className="description">
             Per btw-tarief het bedrag exclusief btw, zoals onderaan de bon. Totaal {formatCurrency(totalExcl + totalVat)},
             waarvan {formatCurrency(totalVat)} btw.
+            {selfAssessed && ' Bij verlegde btw betaal je de leverancier geen btw; je geeft hem zelf aan en trekt hem weer af.'}
           </span>
         </div>
         <div className={`form-section${errors.lines ? ' invalid' : ''}`}>
@@ -275,13 +287,17 @@ export default function ExpenseFields({
               <div className="form-group">
                 {index === 0 && <label>Tarief</label>}
                 <Select
-                  value={rateOptions.find(o => o.value === line.vat_rate) || null}
-                  onChange={(option) => setLine(index, { vat_rate: option?.value || '21' })}
+                  value={rateOptions.find(o => o.value === (line.vat_type !== 'normal' ? line.vat_type : line.vat_rate)) || null}
+                  onChange={(option) => {
+                    const value = option?.value || '21';
+                    // Verlegd, EU of buiten de EU: je geeft zelf 21% btw aan
+                    setLine(index, value in PURCHASE_VAT_TYPES ? { vat_type: value, vat_rate: '21' } : { vat_type: 'normal', vat_rate: value });
+                  }}
                   options={rateOptions}
                 />
               </div>
               <div className="form-group">
-                {index === 0 && <label>Btw</label>}
+                {index === 0 && <label>{selfAssessed ? 'Btw (of zelf aangeven)' : 'Btw'}</label>}
                 <input
                   type="number"
                   step="0.01"
@@ -365,6 +381,7 @@ export function applyReading(formData: ExpenseFormData, reading: any): ExpenseFo
       amount_excl: (Number(line.amount_excl) || 0).toFixed(2),
       vat_rate: (VAT_RATES as readonly number[]).includes(Number(line.vat_rate)) ? String(Number(line.vat_rate)) : '21',
       vat_amount: (Number(line.vat_amount) || 0).toFixed(2),
+      vat_type: line.vat_type in PURCHASE_VAT_TYPES ? line.vat_type : 'normal',
     }));
   const expenseDate = date(reading?.date) || formData.expense_date;
 

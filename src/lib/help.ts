@@ -126,6 +126,13 @@ export const HELP: Record<string, HelpTopic> = {
         ],
       },
       {
+        title: 'Btw verlegd en buitenland',
+        items: [
+          'Kies per prijstabel bij Btw: 21%, 9%, 0%, Btw verlegd (zoals bij onderaanneming), Intracommunautair (een bedrijf in een ander EU-land) of Export buiten de EU.',
+          'Bij verlegd en EU staat de verplichte vermelding met het btw-nummer van de klant op de factuur; zonder dat btw-nummer kun je hem niet versturen.',
+        ],
+      },
+      {
         title: 'Betaald krijgen',
         items: [
           'Je klant scant de QR-code, of betaalt met iDEAL als Mollie aan staat.',
@@ -153,6 +160,7 @@ export const HELP: Record<string, HelpTopic> = {
         title: 'Goed om te weten',
         items: [
           'Bij eten, drinken en relatiegeschenken krijg je de btw niet terug; die telt als kosten.',
+          'Factureert een onderaannemer je met btw verlegd, of koop je in uit het buitenland zonder Nederlandse btw? Kies dan bij Tarief "Btw naar mij verlegd", "Inkoop uit de EU" of "Inkoop van buiten de EU". Je betaalt de leverancier geen btw, maar geeft hem zelf aan en trekt hem in dezelfde aangifte weer af.',
           'Betaal je een inkoopfactuur via de bank, dan zet Bank hem vaak vanzelf op betaald.',
           'Verwijder alleen wat er per ongeluk in staat.',
         ],
@@ -195,6 +203,8 @@ export const HELP: Record<string, HelpTopic> = {
         items: [
           'Omzet op factuurdatum: verstuurde en betaalde facturen, creditfacturen als min-bedrag. Concepten niet.',
           'Voorbelasting (5b): de btw op je kosten, op de datum van de bon. Niet bij eten en drinken.',
+          'Btw verlegd naar je klant telt in 1e, leveringen binnen de EU in 3b en export in 3a. Inkoop met verlegde btw komt in 2a, 4b of 4a: die btw geef je aan in 5a en trek je af in 5b.',
+          'Lever je aan bedrijven in andere EU-landen, dan staat eronder de ICP-opgaaf: per klant het btw-nummer en het bedrag, voor de aparte opgaaf bij de Belastingdienst.',
           'De Belastingdienst rondt af op hele euro’s; neem de bedragen zo over.',
         ],
       },
@@ -203,7 +213,7 @@ export const HELP: Record<string, HelpTopic> = {
         items: [
           'Standaard staat het vorige kwartaal open: daar doe je nu aangifte over.',
           'Exporteren geeft een CSV met alle facturen en kosten van de periode, voor je boekhouder.',
-          'Bij btw verlegd of leveringen naar of uit het buitenland: laat het nakijken door je boekhouder.',
+          'Twijfel je over een buitenlandse levering of een bijzondere regeling? Laat het nakijken door je boekhouder.',
         ],
       },
     ],

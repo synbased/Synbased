@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase';
 import type { Customer, DocumentBlock, Expense, ExpenseLine, Invoice, Quote, Tenant, Note, Product } from './supabase';
+import type { PurchaseVatType, SalesVatType } from './constants';
 import { calculateDocumentTotal, calculateElementTotals, lineTotal } from './utils';
 import { copyBlocks } from './blocks';
 import { isCreditNote, isFinalInvoice } from './invoices';
@@ -94,6 +95,7 @@ async function saveBlocks(
         tax_percentage: Number(element.tax_percentage) || 0,
         discount_percentage: Number(element.discount_percentage) || 0,
         show_quantity: !!element.show_quantity,
+        vat_type: ['reverse_charge', 'eu', 'export'].includes(element.vat_type || '') ? element.vat_type : 'normal',
         position: elementIndex,
       });
     });
@@ -161,7 +163,7 @@ function sortBlocks(blocks: any[] | null | undefined) {
   }));
 }
 
-const ELEMENT_COLUMNS = 'id, kind, body, tax_percentage, discount_percentage, show_quantity, position';
+const ELEMENT_COLUMNS = 'id, kind, body, tax_percentage, discount_percentage, show_quantity, vat_type, position';
 const ITEM_COLUMNS = 'id, description, is_heading, quantity, unit, price, total, position';
 
 /** De klantvelden die bij een offerte, factuur of notitie meekomen. */
@@ -255,6 +257,7 @@ async function fetchLegacyBlocks(soort: Soort, parentId: number | string, tenant
         tax_percentage: Number(block.tax_percentage) || 0,
         discount_percentage: Number(block.discount_percentage) || 0,
         show_quantity: false,
+        vat_type: 'normal',
         position: 0,
         items: [...(block.items || [])].sort(byPosition),
       },
@@ -843,6 +846,23 @@ export async function createInvoice(
   return invoiceData as Invoice;
 }
 
+/**
+ * Bij btw verlegd en een levering binnen de EU moet het btw-nummer van de
+ * klant op de factuur staan. Ontbreekt het, dan wordt een concept niet
+ * vastgelegd; een factuur die al vastligt laten we met rust.
+ */
+async function checkVatNumber(id: string | number, tenantId: string) {
+  const invoice = await getInvoice(id, tenantId);
+  if (invoice.status !== 'draft' || invoice.customer?.btw_number) return;
+
+  const needsNumber = (invoice.blocks as DocumentBlock[]).some(block =>
+    block.elements.some(element => element.vat_type === 'reverse_charge' || element.vat_type === 'eu')
+  );
+  if (needsNumber) {
+    throw new Error('Vul eerst het btw-nummer van de klant in. Bij btw verlegd of een levering binnen de EU moet dat op de factuur staan.');
+  }
+}
+
 export async function updateInvoice(
   id: string | number,
   tenantId: string,
@@ -868,6 +888,7 @@ export async function updateInvoice(
 
   // Uit concept betekent vastleggen, en een vastliggende factuur heeft een nummer
   if (updates.status !== undefined && updates.status !== 'draft') {
+    await checkVatNumber(id, tenantId);
     await assignInvoiceNumber(id, tenantId);
   }
 
@@ -1000,8 +1021,17 @@ export async function createCreditNote(invoiceId: string | number, tenantId: str
 }
 
 /** Omzet en btw van één tarief */
+/** Omzet en btw van één tarief en soort: gewoon, verlegd, EU of export */
 export interface VatRate {
   rate: number;
+  type: SalesVatType;
+  base: number;
+  vat: number;
+}
+
+/** Inkoop waarbij je de btw zelf aangeeft: rubriek 2a, 4b en 4a */
+export interface SelfAssessedVat {
+  type: Exclude<PurchaseVatType, 'normal'>;
   base: number;
   vat: number;
 }
@@ -1035,21 +1065,29 @@ export interface VatExpense {
   total: number;
   status: string;
   paid_at: string | null;
-  /** De btw die als voorbelasting telt; 0 bij eten en drinken */
+  /** Alle btw die als voorbelasting telt, ook de zelf aangegeven; 0 bij eten en drinken */
   deductible: number;
+  /** Van de betaalde btw (vat_amount) het deel dat aftrekbaar is */
+  paidDeductible: number;
+  /** De btw die je zelf aangeeft bij verlegde inkoop, per soort */
+  selfAssessed: SelfAssessedVat[];
 }
 
 const cents = (amount: number) => Math.round(amount * 100) / 100;
 
-/** Telt de bedragen per tarief bij elkaar op, hoogste tarief eerst */
-function addRates(target: Map<number, VatRate>, rates: VatRate[]) {
-  for (const { rate, base, vat } of rates) {
-    const current = target.get(rate) || { rate, base: 0, vat: 0 };
-    target.set(rate, { rate, base: cents(current.base + base), vat: cents(current.vat + vat) });
+/** Telt de bedragen per tarief en soort bij elkaar op */
+function addRates(target: Map<string, VatRate>, rates: VatRate[]) {
+  for (const { rate, type, base, vat } of rates) {
+    const key = `${type}:${rate}`;
+    const current = target.get(key) || { rate, type, base: 0, vat: 0 };
+    target.set(key, { rate, type, base: cents(current.base + base), vat: cents(current.vat + vat) });
   }
 }
 
-const sortedRates = (rates: Map<number, VatRate>) => [...rates.values()].sort((a, b) => b.rate - a.rate);
+/** Gewone btw eerst, hoogste tarief bovenaan; daarna verlegd, EU en export */
+const TYPE_ORDER: SalesVatType[] = ['normal', 'reverse_charge', 'eu', 'export'];
+const sortedRates = (rates: Map<string, VatRate>) =>
+  [...rates.values()].sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || b.rate - a.rate);
 
 /**
  * Het btw-overzicht over een periode, voor de btw-aangifte: per tarief de
@@ -1075,25 +1113,26 @@ export async function getVatOverview(tenantId: string, from: string, to: string)
   if (error) throw error;
 
   // De prijstabellen van al die facturen, in stukken zodat de vraag niet te lang wordt
-  const ratesPerInvoice = new Map<number, Map<number, VatRate>>();
+  const ratesPerInvoice = new Map<number, Map<string, VatRate>>();
   const ids = (invoices || []).map((invoice: any) => invoice.id);
 
   for (let i = 0; i < ids.length; i += 200) {
     const { data: blocks, error: blocksError } = await supabase
       .from('invoice_blocks')
-      .select('invoice_id, elements:invoice_elements(kind, tax_percentage, discount_percentage, items:invoice_items(quantity, price, is_heading))')
+      .select('invoice_id, elements:invoice_elements(kind, tax_percentage, discount_percentage, vat_type, items:invoice_items(quantity, price, is_heading))')
       .eq('tenant_id', tenantId)
       .in('invoice_id', ids.slice(i, i + 200));
 
     if (blocksError) throw blocksError;
 
     for (const block of (blocks || []) as any[]) {
-      const rates = ratesPerInvoice.get(block.invoice_id) || new Map<number, VatRate>();
+      const rates = ratesPerInvoice.get(block.invoice_id) || new Map<string, VatRate>();
       for (const element of block.elements || []) {
         if (element.kind !== 'prijstabel') continue;
         const totals = calculateElementTotals(element);
         addRates(rates, [{
           rate: Number(element.tax_percentage) || 0,
+          type: (element.vat_type || 'normal') as SalesVatType,
           base: cents(totals.subtotal - totals.discount),
           vat: cents(totals.tax),
         }]);
@@ -1102,7 +1141,7 @@ export async function getVatOverview(tenantId: string, from: string, to: string)
     }
   }
 
-  const totalRates = new Map<number, VatRate>();
+  const totalRates = new Map<string, VatRate>();
   const rows: VatInvoice[] = (invoices || []).map((invoice: any) => {
     const rates = sortedRates(ratesPerInvoice.get(invoice.id) || new Map());
     addRates(totalRates, rates);
@@ -1115,7 +1154,7 @@ export async function getVatOverview(tenantId: string, from: string, to: string)
   // behalve bij eten en drinken, waar hij niet aftrekbaar is
   const { data: expenses, error: expensesError } = await supabase
     .from('expenses')
-    .select('id, supplier, reference, expense_date, category, total_excl, vat_amount, total, status, paid_at')
+    .select('id, supplier, reference, expense_date, category, total_excl, vat_amount, total, status, paid_at, lines:expense_lines(amount_excl, vat_amount, vat_type)')
     .eq('tenant_id', tenantId)
     .gte('expense_date', from)
     .lte('expense_date', to)
@@ -1123,17 +1162,45 @@ export async function getVatOverview(tenantId: string, from: string, to: string)
 
   if (expensesError) throw expensesError;
 
-  const expenseRows: VatExpense[] = (expenses || []).map((expense: any) => ({
-    ...expense,
-    total_excl: Number(expense.total_excl) || 0,
-    vat_amount: Number(expense.vat_amount) || 0,
-    total: Number(expense.total) || 0,
-    deductible: isVatDeductible(expense.category) ? Number(expense.vat_amount) || 0 : 0,
-  }));
+  // Verlegde inkoop: geen btw aan de leverancier, die geef je zelf aan (2a, 4b,
+  // 4a) en trek je in dezelfde aangifte weer af, als de categorie dat toestaat
+  const purchases = new Map<SelfAssessedVat['type'], SelfAssessedVat>();
+  const expenseRows: VatExpense[] = (expenses || []).map(({ lines, ...expense }: any) => {
+    const deductibleCategory = isVatDeductible(expense.category);
+    const selfAssessed = new Map<SelfAssessedVat['type'], SelfAssessedVat>();
+    for (const line of lines || []) {
+      if (!line.vat_type || line.vat_type === 'normal') continue;
+      for (const target of [selfAssessed, purchases]) {
+        const current = target.get(line.vat_type) || { type: line.vat_type, base: 0, vat: 0 };
+        target.set(line.vat_type, {
+          ...current,
+          base: cents(current.base + (Number(line.amount_excl) || 0)),
+          vat: cents(current.vat + (Number(line.vat_amount) || 0)),
+        });
+      }
+    }
+    const selfVat = [...selfAssessed.values()].reduce((sum, s) => sum + s.vat, 0);
+    const paidDeductible = deductibleCategory ? Number(expense.vat_amount) || 0 : 0;
+    return {
+      ...expense,
+      total_excl: Number(expense.total_excl) || 0,
+      vat_amount: Number(expense.vat_amount) || 0,
+      total: Number(expense.total) || 0,
+      paidDeductible,
+      selfAssessed: [...selfAssessed.values()],
+      deductible: cents(paidDeductible + (deductibleCategory ? selfVat : 0)),
+    };
+  });
 
   const inputVat = cents(expenseRows.reduce((sum, e) => sum + e.deductible, 0));
 
-  return { rates: sortedRates(totalRates), invoices: rows, expenses: expenseRows, inputVat };
+  return {
+    rates: sortedRates(totalRates),
+    purchases: [...purchases.values()],
+    invoices: rows,
+    expenses: expenseRows,
+    inputVat,
+  };
 }
 
 // Expenses
@@ -1153,7 +1220,7 @@ export async function getExpenses(tenantId: string) {
 export async function getExpense(id: string | number, tenantId: string) {
   const { data, error } = await supabase
     .from('expenses')
-    .select('*, lines:expense_lines(id, description, amount_excl, vat_rate, vat_amount, position)')
+    .select('*, lines:expense_lines(id, description, amount_excl, vat_rate, vat_amount, vat_type, position)')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .maybeSingle();
@@ -1165,10 +1232,16 @@ export async function getExpense(id: string | number, tenantId: string) {
   return { ...expense, lines: [...(expense.lines || [])].sort(byPosition) } as Expense;
 }
 
-/** De bedragen van een kostenpost: de som van zijn regels, op centen */
+/**
+ * De bedragen van een kostenpost: de som van zijn regels, op centen. Alleen
+ * gewone btw betaal je de leverancier; verlegde btw geef je zelf aan en zit
+ * dus niet in het totaal of in vat_amount.
+ */
 function expenseTotals(lines: ExpenseLine[]) {
   const total_excl = cents(lines.reduce((sum, line) => sum + (Number(line.amount_excl) || 0), 0));
-  const vat_amount = cents(lines.reduce((sum, line) => sum + (Number(line.vat_amount) || 0), 0));
+  const vat_amount = cents(
+    lines.filter(line => !line.vat_type || line.vat_type === 'normal').reduce((sum, line) => sum + (Number(line.vat_amount) || 0), 0)
+  );
   return { total_excl, vat_amount, total: cents(total_excl + vat_amount) };
 }
 
@@ -1186,6 +1259,7 @@ async function saveExpenseLines(expenseId: number | string, tenantId: string, li
       amount_excl: cents(Number(line.amount_excl) || 0),
       vat_rate: Number(line.vat_rate) || 0,
       vat_amount: cents(Number(line.vat_amount) || 0),
+      vat_type: line.vat_type || 'normal',
       position,
     }))
   );

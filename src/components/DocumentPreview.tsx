@@ -1,3 +1,4 @@
+import { SALES_VAT_TYPES } from '@/lib/constants';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GripVertical } from 'lucide-react';
 import TemplatedDocument from '@/components/TemplatedDocument';
@@ -244,12 +245,15 @@ function PriceCell({
 function PriceTable({
   element,
   currency,
+  customerVatNumber,
   van,
   tot,
   edit,
 }: {
   element: DocumentElement;
   currency: string;
+  /** Het btw-nummer van de klant; verplicht op de factuur bij btw verlegd en EU */
+  customerVatNumber?: string | null;
   van?: number;
   tot?: number;
   /** Op het papier bewerken: welk blok en element dit is, en waar de wijziging heen gaat */
@@ -445,10 +449,21 @@ function PriceTable({
             <span>- {formatCurrency(totals.discount, currency)}</span>
           </div>
         )}
-        <div className="invoice-total-row">
-          <span>BTW ({element.tax_percentage}%)</span>
-          <span>{formatCurrency(totals.tax, currency)}</span>
-        </div>
+        {element.vat_type && element.vat_type !== 'normal' ? (
+          // De verplichte vermelding in plaats van een btw-bedrag
+          <div className="invoice-total-row">
+            <span>
+              {SALES_VAT_TYPES[element.vat_type].note}
+              {SALES_VAT_TYPES[element.vat_type].needsVatNumber && customerVatNumber ? ` · btw-nummer afnemer ${customerVatNumber}` : ''}
+            </span>
+            <span>{formatCurrency(0, currency)}</span>
+          </div>
+        ) : (
+          <div className="invoice-total-row">
+            <span>BTW ({element.tax_percentage}%)</span>
+            <span>{formatCurrency(totals.tax, currency)}</span>
+          </div>
+        )}
         <div className="invoice-total-row total-final">
           <span>Totaal incl. btw</span>
           <span>{formatCurrency(totals.total, currency)}</span>
@@ -678,6 +693,7 @@ function ElementContent({
         <PriceTable
           element={element}
           currency={currency}
+          customerVatNumber={customer?.btw_number}
           van={van}
           tot={tot}
           edit={editTarget && onItemsChange && { ...editTarget, onChange: onItemsChange }}

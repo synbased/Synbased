@@ -114,6 +114,7 @@ Wat je teruggeeft:
 - description: een korte omschrijving van wat er gekocht is, in een paar woorden.
 - category: de beste keuze uit deze lijst (gebruik precies de code): ${EXPENSE_CATEGORIES.map(c => `${c.value} (${c.label})`).join(', ')}.
 - lines: per btw-tarief één regel met het bedrag exclusief btw, het tarief (21, 9 of 0) en het btw-bedrag, zoals ze in het btw-overzicht onderaan de bon staan. Staat er alleen een totaal inclusief btw met een tarief, reken dan terug. Gebruik in description het tarief, zoals "21% btw". Bedragen in euro's als getal, met twee decimalen.
+- vat_type per regel: "normal" voor gewone btw. Staat er "btw verlegd" van een Nederlandse leverancier (zoals een onderaannemer), dan "reverse_charge" met vat_rate 21 en vat_amount 0. Een factuur van een leverancier uit een ander EU-land zonder Nederlandse btw (vaak met "reverse charge" of "intra-community"): "eu". Van buiten de EU zonder btw: "import".
 - paid: true bij een kassabon, pinbon of als er "voldaan" of "betaald" op staat; anders false.
 
 Verzin niets: wat je niet kunt lezen laat je leeg, of 0 bij een bedrag.`;

@@ -1,3 +1,4 @@
+import { SALES_VAT_TYPES, type SalesVatType } from '@/lib/constants';
 import { ReactNode, useEffect, useState } from 'react';
 import {
   ArrowDown,
@@ -43,10 +44,12 @@ interface IslandBarProps {
   dataFields?: ReactNode;
 }
 
+/** Gewone tarieven, en daaronder de bijzondere soorten zonder btw op de factuur */
 const taxOptions = [
-  { value: '0', label: '0%' },
-  { value: '9', label: '9%' },
   { value: '21', label: '21%' },
+  { value: '9', label: '9%' },
+  { value: '0', label: '0%' },
+  ...Object.entries(SALES_VAT_TYPES).map(([value, { label }]) => ({ value, label })),
 ];
 
 const discountOptions = [
@@ -279,12 +282,28 @@ export default function IslandBar({
             </label>
 
             <div className="form-group">
-              <label>BTW percentage</label>
+              <label>Btw</label>
               <Select
-                value={taxOptions.find(o => o.value === String(element.tax_percentage)) || null}
-                onChange={(option) => updateElement(elementIndex, { tax_percentage: Number(option?.value ?? 21) })}
+                value={
+                  taxOptions.find(o =>
+                    o.value === (element.vat_type && element.vat_type !== 'normal' ? element.vat_type : String(element.tax_percentage))
+                  ) || null
+                }
+                onChange={(option) => {
+                  const value = option?.value ?? '21';
+                  // Verlegd, EU of export: geen tarief; anders weer een gewoon tarief
+                  updateElement(
+                    elementIndex,
+                    value in SALES_VAT_TYPES
+                      ? { vat_type: value as SalesVatType, tax_percentage: 0 }
+                      : { vat_type: 'normal', tax_percentage: Number(value) }
+                  );
+                }}
                 options={taxOptions}
               />
+              {element.vat_type && element.vat_type !== 'normal' && SALES_VAT_TYPES[element.vat_type].needsVatNumber && (
+                <p className="field-note">Op de factuur komt het btw-nummer van de klant; vul dat in bij de klant.</p>
+              )}
             </div>
 
             <div className="form-group">

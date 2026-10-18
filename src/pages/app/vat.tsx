@@ -6,25 +6,43 @@ import Table from '@/components/Table';
 import Select, { SelectOption } from '@/components/Select';
 import { Skeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
-import { INVOICE_STATUS } from '@/lib/constants';
+import { INVOICE_STATUS, SALES_VAT_TYPES } from '@/lib/constants';
 import { isCreditNote } from '@/lib/invoices';
 import { formatCurrency, formatDate, getCustomerDisplayName } from '@/lib/utils';
 import { categoryLabel } from '@/lib/expenses';
-import type { VatExpense, VatInvoice, VatRate } from '@/lib/db';
+import type { SelfAssessedVat, VatExpense, VatInvoice, VatRate } from '@/lib/db';
 
 interface Overview {
   rates: VatRate[];
+  purchases: SelfAssessedVat[];
   invoices: VatInvoice[];
   expenses: VatExpense[];
   inputVat: number;
 }
 
-/** De rubrieken voor omzet op de btw-aangifte, met welk tarief erin valt */
-const SALES_RUBRICS = [
-  { code: '1a', label: 'Leveringen/diensten belast met hoog tarief', matches: (rate: number) => rate === 21 },
-  { code: '1b', label: 'Leveringen/diensten belast met laag tarief', matches: (rate: number) => rate === 9 },
-  { code: '1c', label: 'Leveringen/diensten belast met overige tarieven', matches: (rate: number) => ![0, 9, 21].includes(rate) },
-  { code: '1e', label: 'Leveringen/diensten belast met 0% of niet bij u belast', matches: (rate: number) => rate === 0 },
+/**
+ * De rubrieken van de btw-aangifte, in de volgorde van het formulier. Omzet
+ * komt uit de prijstabellen (tarief en soort), inkoop met verlegde btw uit de
+ * kosten. `always` staat er altijd; de rest alleen als er iets in zit.
+ */
+const RUBRICS: {
+  code: string;
+  label: string;
+  always?: boolean;
+  /** Btw tonen; bij 1e, 3a en 3b is er geen */
+  withVat?: boolean;
+  sales?: (rate: VatRate) => boolean;
+  purchase?: SelfAssessedVat['type'];
+}[] = [
+  { code: '1a', label: 'Leveringen/diensten belast met hoog tarief', always: true, withVat: true, sales: r => r.type === 'normal' && r.rate === 21 },
+  { code: '1b', label: 'Leveringen/diensten belast met laag tarief', always: true, withVat: true, sales: r => r.type === 'normal' && r.rate === 9 },
+  { code: '1c', label: 'Leveringen/diensten belast met overige tarieven', withVat: true, sales: r => r.type === 'normal' && ![0, 9, 21].includes(r.rate) },
+  { code: '1e', label: 'Leveringen/diensten belast met 0% of niet bij u belast', always: true, sales: r => (r.type === 'normal' && r.rate === 0) || r.type === 'reverse_charge' },
+  { code: '2a', label: 'Leveringen/diensten waarbij de btw naar u is verlegd', withVat: true, purchase: 'reverse_charge' },
+  { code: '3a', label: 'Leveringen naar landen buiten de EU', sales: r => r.type === 'export' },
+  { code: '3b', label: 'Leveringen naar of diensten in landen binnen de EU', sales: r => r.type === 'eu' },
+  { code: '4a', label: 'Leveringen/diensten uit landen buiten de EU', withVat: true, purchase: 'import' },
+  { code: '4b', label: 'Leveringen/diensten uit landen binnen de EU', withVat: true, purchase: 'eu' },
 ];
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -85,29 +103,45 @@ export default function Vat() {
   }, [period]);
 
   const rates = overview?.rates || [];
+  const purchases = overview?.purchases || [];
   const invoices = overview?.invoices || [];
   const expenses = overview?.expenses || [];
   const inputVat = overview?.inputVat || 0;
-  const totalVat = rates.reduce((sum, r) => sum + r.vat, 0);
-  const balance = Math.round((totalVat - inputVat) * 100) / 100;
   const isEmpty = invoices.length === 0 && expenses.length === 0;
 
-  // Per rubriek de omzet en de btw; een rubriek zonder iets erin blijft 0
-  const salesRows = SALES_RUBRICS.map((rubric) => {
-    const matching = rates.filter(r => rubric.matches(r.rate));
+  // Per rubriek de omzet en de btw; rubrieken die niet altijd staan alleen als er iets in zit
+  const rubricRows = RUBRICS.map((rubric) => {
+    const parts = rubric.sales ? rates.filter(rubric.sales) : purchases.filter(p => p.type === rubric.purchase);
     return {
       ...rubric,
-      base: matching.reduce((sum, r) => sum + r.base, 0),
-      vat: matching.reduce((sum, r) => sum + r.vat, 0),
+      base: parts.reduce((sum, p) => sum + p.base, 0),
+      vat: parts.reduce((sum, p) => sum + p.vat, 0),
     };
-  });
+  }).filter(row => row.always || row.base !== 0 || row.vat !== 0);
+
+  // 5a: de btw van alle rubrieken samen, ook wat je bij verlegde inkoop zelf aangeeft
+  const totalVat = Math.round(rubricRows.reduce((sum, row) => sum + (row.withVat ? row.vat : 0), 0) * 100) / 100;
+  const balance = Math.round((totalVat - inputVat) * 100) / 100;
+
+  // De ICP-opgaaf: per klant in de EU het btw-nummer en het bedrag
+  const icp = new Map<string, { name: string; amount: number }>();
+  for (const invoice of invoices) {
+    const amount = invoice.rates.filter(r => r.type === 'eu').reduce((sum, r) => sum + r.base, 0);
+    if (!amount) continue;
+    const number = invoice.customer?.btw_number || 'Btw-nummer ontbreekt';
+    const current = icp.get(number) || { name: invoice.customer ? getCustomerDisplayName(invoice.customer) : '', amount: 0 };
+    icp.set(number, { ...current, amount: current.amount + amount });
+  }
+
+  /** Een kolom in de export per tarief en soort, zoals "21%" of "Btw verlegd" */
+  const rateLabel = (rate: VatRate) => (rate.type === 'normal' ? `${rate.rate}%` : SALES_VAT_TYPES[rate.type].label);
 
   const handleExport = () => {
     // Een kolom per tarief, zodat de boekhouder per rubriek kan optellen
-    const rateColumns = rates.map(r => r.rate);
+    const rateColumns = rates;
     const header = [
       'Soort', 'Nummer', 'Datum', 'Relatie', 'Btw-nummer',
-      ...rateColumns.flatMap(rate => [`Omzet ${rate}%`, `Btw ${rate}%`]),
+      ...rateColumns.flatMap(rate => [`Omzet ${rateLabel(rate)}`, `Btw ${rateLabel(rate)}`]),
       'Totaal excl. btw', 'Btw', 'Totaal incl. btw', 'Status', 'Betaald op',
     ];
     const rows = invoices.map(invoice => [
@@ -117,7 +151,7 @@ export default function Vat() {
       invoice.customer ? getCustomerDisplayName(invoice.customer) : '',
       invoice.customer?.btw_number || '',
       ...rateColumns.flatMap(rate => {
-        const part = invoice.rates.find(r => r.rate === rate);
+        const part = invoice.rates.find(r => r.rate === rate.rate && r.type === rate.type);
         return [csvAmount(part?.base || 0), csvAmount(part?.vat || 0)];
       }),
       csvAmount(invoice.base),
@@ -180,12 +214,12 @@ export default function Vat() {
           ) : (
             <>
               <Table headers={['Rubriek', 'Omschrijving', 'Omzet', 'Btw']}>
-                {salesRows.map((row) => (
+                {rubricRows.map((row) => (
                   <tr key={row.code}>
                     <td>{row.code}</td>
                     <td>{row.label}</td>
                     <td>{formatCurrency(row.base)}</td>
-                    <td>{row.code === '1e' ? '' : formatCurrency(row.vat)}</td>
+                    <td>{row.withVat ? formatCurrency(row.vat) : ''}</td>
                   </tr>
                 ))}
                 <tr>
@@ -215,6 +249,25 @@ export default function Vat() {
           )}
         </div>
       </div>
+
+      {!isLoading && icp.size > 0 && (
+        <div className="grid">
+          <div className="block">
+            <div className="header">
+              <h2>ICP-opgaaf</h2>
+            </div>
+            <Table headers={['Btw-nummer', 'Klant', 'Bedrag']}>
+              {[...icp.entries()].map(([number, { name, amount }]) => (
+                <tr key={number}>
+                  <td>{number}</td>
+                  <td>{name}</td>
+                  <td>{formatCurrency(amount)}</td>
+                </tr>
+              ))}
+            </Table>
+          </div>
+        </div>
+      )}
 
       {!isLoading && invoices.length > 0 && (
         <div className="grid">

@@ -39,7 +39,9 @@ export function lineTotal(item: Pick<LineItem, 'quantity' | 'price' | 'is_headin
  * BTW-tarief, zodat 9% schilderwerk en 21% overig werk elk hun eigen subtotaal
  * krijgen. Eén bron van waarheid voor de browser en de API.
  */
-export function calculateElementTotals(element: Pick<DocumentElement, 'items' | 'tax_percentage' | 'discount_percentage' | 'kind'>) {
+export function calculateElementTotals(
+  element: Pick<DocumentElement, 'items' | 'tax_percentage' | 'discount_percentage' | 'kind'> & { vat_type?: string | null }
+) {
   if (element.kind !== 'prijstabel') {
     return { subtotal: 0, discount: 0, tax: 0, total: 0 };
   }
@@ -47,7 +49,9 @@ export function calculateElementTotals(element: Pick<DocumentElement, 'items' | 
   const subtotal = element.items.reduce((sum, item) => sum + lineTotal(item), 0);
   const discount = (subtotal * (Number(element.discount_percentage) || 0)) / 100;
   const taxableAmount = subtotal - discount;
-  const tax = (taxableAmount * (Number(element.tax_percentage) || 0)) / 100;
+  // Verlegd, EU of export: geen btw op de factuur, die regelt de afnemer of er is er geen
+  const special = !!element.vat_type && element.vat_type !== 'normal';
+  const tax = special ? 0 : (taxableAmount * (Number(element.tax_percentage) || 0)) / 100;
 
   return {
     subtotal,

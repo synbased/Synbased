@@ -28,6 +28,7 @@ export const emptyElement = (kind: ElementKind): DocumentElement => ({
   tax_percentage: 21,
   discount_percentage: 0,
   show_quantity: false,
+  vat_type: 'normal',
   items: kind === 'prijstabel' ? [emptyItem()] : [],
 });
 
@@ -59,6 +60,7 @@ export function duplicateElement(element: DocumentElement): DocumentElement {
     tax_percentage: element.tax_percentage,
     discount_percentage: element.discount_percentage,
     show_quantity: element.show_quantity,
+    vat_type: element.vat_type || 'normal',
     items: element.items.map(item => ({ ...item, id: undefined })),
   };
 }
@@ -84,6 +86,7 @@ export function copyBlocks(blocks: any[] | null | undefined): DocumentBlock[] {
       tax_percentage: Number(element.tax_percentage) || 0,
       discount_percentage: Number(element.discount_percentage) || 0,
       show_quantity: !!element.show_quantity,
+      vat_type: element.vat_type || 'normal',
       items: (element.items || []).map((item: any) => ({
         description: item.description || '',
         is_heading: !!item.is_heading,

@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { PurchaseVatType, SalesVatType } from './constants';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -141,6 +142,8 @@ export interface DocumentElement {
   discount_percentage: number;
   /** Alleen bij een prijstabel: de kolommen Aantal, Eenheid en Prijs tonen */
   show_quantity: boolean;
+  /** Alleen bij een prijstabel: gewoon, verlegd, EU of export (zie SALES_VAT_TYPES) */
+  vat_type?: SalesVatType;
   position?: number;
   items: LineItem[];
 }
@@ -232,7 +235,10 @@ export interface ExpenseLine {
   description: string;
   amount_excl: number;
   vat_rate: number;
+  /** Bij gewone btw wat je de leverancier betaalt; anders de btw die je zelf aangeeft */
   vat_amount: number;
+  /** Gewoon, naar jou verlegd, uit de EU of van buiten de EU (zie PURCHASE_VAT_TYPES) */
+  vat_type?: PurchaseVatType;
   position?: number;
 }
 

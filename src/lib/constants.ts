@@ -81,6 +81,31 @@ export const BANK_CATEGORIES: { value: string; label: string; account: string }[
   { value: 'other_costs', label: 'Overige kosten zonder bon', account: '4990' },
 ];
 
+/**
+ * De soort btw op een verkoop, per prijstabel. Behalve gewoon is de btw 0 en
+ * staat er een verplichte vermelding op de factuur; bij verlegd en EU ook het
+ * btw-nummer van de klant. De rubriek is die op de btw-aangifte.
+ */
+export type SalesVatType = 'normal' | 'reverse_charge' | 'eu' | 'export';
+
+export const SALES_VAT_TYPES: Record<Exclude<SalesVatType, 'normal'>, { label: string; note: string; rubric: string; needsVatNumber: boolean }> = {
+  reverse_charge: { label: 'Btw verlegd', note: 'Btw verlegd', rubric: '1e', needsVatNumber: true },
+  eu: { label: 'Intracommunautair (EU)', note: 'Intracommunautaire levering, btw verlegd', rubric: '3b', needsVatNumber: true },
+  export: { label: 'Export buiten de EU', note: 'Export buiten de EU, 0% btw', rubric: '3a', needsVatNumber: false },
+};
+
+/**
+ * De soort btw op een inkoop, per regel. Behalve gewoon betaal je de
+ * leverancier geen btw, maar geef je hem zelf aan (en trek je hem weer af).
+ */
+export type PurchaseVatType = 'normal' | 'reverse_charge' | 'eu' | 'import';
+
+export const PURCHASE_VAT_TYPES: Record<Exclude<PurchaseVatType, 'normal'>, { label: string; rubric: string }> = {
+  reverse_charge: { label: 'Btw naar mij verlegd', rubric: '2a' },
+  eu: { label: 'Inkoop uit de EU', rubric: '4b' },
+  import: { label: 'Inkoop van buiten de EU', rubric: '4a' },
+};
+
 /** De btw-tarieven in Nederland */
 export const VAT_RATES = [21, 9, 0] as const;
 

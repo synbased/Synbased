@@ -103,6 +103,8 @@ export const ReceiptReadingSchema = z.object({
   ),
   /** Of het al betaald is, zoals bij een kassabon of "voldaan" */
   paid: z.boolean(),
+  /** Het eindtotaal inclusief btw dat op de bon staat; om de regels mee na te rekenen */
+  total_incl: z.number(),
 });
 
 export type ReceiptReading = z.infer<typeof ReceiptReadingSchema>;

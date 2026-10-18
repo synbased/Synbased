@@ -12,15 +12,17 @@ import { AiKeyError, QuoteProposalSchema, ReceiptReadingSchema, type AiProvider 
  */
 const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
-/** Een vast, rustiger model om op terug te vallen als het nieuwste Flash-model overbelast is */
-const FALLBACK_MODEL = 'gemini-2.5-flash';
-
 /**
- * Voor bonnen: Flash-Lite is gemaakt voor snel overtikwerk zoals dit, en veel
- * minder druk dan het nieuwste Flash-model. Met GEMINI_RECEIPT_MODEL kies je
- * zelf een ander model.
+ * Voor bonnen: Flash-Lite. Gemeten op een kassabon: rond 1,5 seconde en goed
+ * gelezen, tegen 26 seconden voor Flash met standaard nadenken. De -latest-
+ * namen volgen vanzelf de nieuwste versie; vaste versies zoals 2.5 verdwijnen
+ * voor nieuwe gebruikers. Met GEMINI_RECEIPT_MODEL kies je zelf een model.
  */
-const RECEIPT_MODEL = process.env.GEMINI_RECEIPT_MODEL || 'gemini-2.5-flash-lite';
+const RECEIPT_MODEL = process.env.GEMINI_RECEIPT_MODEL || 'gemini-flash-lite-latest';
+
+/** Is het eerste model overbelast, dan het andere: Lite en Flash vangen elkaar op */
+const FALLBACK_MODEL = 'gemini-flash-lite-latest';
+const RECEIPT_FALLBACK_MODEL = 'gemini-flash-latest';
 
 /** Zo lang wachten voor een volgende poging, in milliseconden */
 const RETRY_DELAYS = [800, 2000];
@@ -77,6 +79,25 @@ function client(apiKey: string) {
   return new GoogleGenAI({ apiKey, httpOptions: { timeout: REQUEST_TIMEOUT } });
 }
 
+/**
+ * Probeert de denkinstellingen op volgorde: niet elk model kent elk niveau, en
+ * een onbekend niveau geeft een fout 400 over "thinking". Undefined is de
+ * standaard van het model.
+ */
+async function withThinking<T>(
+  options: (ThinkingConfig | undefined)[],
+  ask: (thinkingConfig: ThinkingConfig | undefined) => Promise<T>
+): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await ask(options[i]);
+    } catch (error) {
+      const unknownLevel = error instanceof ApiError && error.status === 400 && /think/i.test(error.message);
+      if (!unknownLevel || i === options.length - 1) throw error;
+    }
+  }
+}
+
 /** Een fout van Google als een melding die de gebruiker begrijpt. */
 function explain(error: unknown): Error {
   if (error instanceof ApiError) {
@@ -113,15 +134,21 @@ export const gemini: AiProvider = {
 
   async proposeQuote(apiKey, input) {
     try {
-      const response = await withRetries((model) => client(apiKey).models.generateContent({
-        model,
-        contents: buildUserPrompt(input),
-        config: {
-          systemInstruction: systemPrompt(input.source),
-          responseMimeType: 'application/json',
-          responseJsonSchema: RESPONSE_SCHEMA,
-        },
-      }));
+      // Een offerte vraagt wat denkwerk, maar niet het standaard lange nadenken
+      const response = await withRetries((model) =>
+        withThinking([{ thinkingLevel: ThinkingLevel.LOW }, undefined], (thinkingConfig) =>
+          client(apiKey).models.generateContent({
+            model,
+            contents: buildUserPrompt(input),
+            config: {
+              systemInstruction: systemPrompt(input.source),
+              responseMimeType: 'application/json',
+              responseJsonSchema: RESPONSE_SCHEMA,
+              ...(thinkingConfig ? { thinkingConfig } : {}),
+            },
+          })
+        )
+      );
 
       const parsed = QuoteProposalSchema.safeParse(JSON.parse(response.text || 'null'));
       if (!parsed.success) throw new Error('De AI kwam niet tot een volledig voorstel. Probeer het opnieuw.');
@@ -135,7 +162,7 @@ export const gemini: AiProvider = {
   },
 
   async readReceipt(apiKey, file) {
-    const read = (model: string, thinkingConfig: ThinkingConfig) =>
+    const read = (model: string, thinkingConfig: ThinkingConfig | undefined) =>
       client(apiKey).models.generateContent({
         model,
         contents: [
@@ -151,30 +178,24 @@ export const gemini: AiProvider = {
           systemInstruction: RECEIPT_PROMPT,
           responseMimeType: 'application/json',
           responseJsonSchema: RECEIPT_SCHEMA,
-          thinkingConfig,
+          ...(thinkingConfig ? { thinkingConfig } : {}),
         },
       });
 
-    // Een bon overnemen is geen denkwerk. Gemini 2.5 zet nadenken uit met een
-    // budget van 0, nieuwere modellen met het laagste denkniveau; meteen de
-    // goede, zodat er geen tweede vraag nodig is. Kent het model hem toch
-    // niet, dan alsnog de andere
+    // Een bon overnemen is geen denkwerk: het laagste denkniveau dat het model
+    // kent. Flash-Lite kent minimaal, Flash pas laag
     let usedModel = RECEIPT_MODEL;
-    const readWithoutThinking = async (model: string) => {
+    const readWithoutThinking = (model: string) => {
       usedModel = model;
-      const first: ThinkingConfig = /2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: ThinkingLevel.MINIMAL };
-      try {
-        return await read(model, first);
-      } catch (error) {
-        if (!(error instanceof ApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error;
-        return read(model, 'thinkingBudget' in first ? { thinkingLevel: ThinkingLevel.MINIMAL } : { thinkingBudget: 0 });
-      }
+      return withThinking([{ thinkingLevel: ThinkingLevel.MINIMAL }, { thinkingLevel: ThinkingLevel.LOW }, undefined], (thinkingConfig) =>
+        read(model, thinkingConfig)
+      );
     };
 
     // In de logs van Vercel: welk model en hoe lang, zodat traagheid te vinden is
     const started = Date.now();
     try {
-      const response = await withRetries(readWithoutThinking, RECEIPT_MODEL, process.env.GEMINI_RECEIPT_MODEL ? null : FALLBACK_MODEL);
+      const response = await withRetries(readWithoutThinking, RECEIPT_MODEL, process.env.GEMINI_RECEIPT_MODEL ? null : RECEIPT_FALLBACK_MODEL);
       console.log(`[gemini] bon gelezen met ${usedModel} in ${Date.now() - started} ms`);
 
       const parsed = ReceiptReadingSchema.safeParse(JSON.parse(response.text || 'null'));

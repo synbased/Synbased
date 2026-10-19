@@ -129,7 +129,7 @@ button {font-family: var(--font-family1); font-size: var(--fontsize2); backgroun
 .datepicker .day.selected, .datepicker .day.selected:hover, .datepicker .day:hover:not(.empty) {font-weight: 500; color: var(--color5); background: #d2e1ff;}
 
 .login-wrapper {min-height: 100vh; display: flex; align-items: center; justify-content: center;}
-.login-wrapper .login-block {width: 100%; max-width: 400px;}
+.login-wrapper .login-block {width: 100%; max-width: 400px; padding: var(--space20); box-sizing: border-box;}
 .login-wrapper .login-block .logo {display: flex; justify-content: center; margin: 0 0 var(--space20) 0;}
 .login-wrapper .login-block h1 {text-align: center; margin: 0 0 var(--space20) 0;}
 .login-wrapper .login-block .password-field, .register-wrapper .register-block .password-field {margin: 0 0 var(--space10) 0;}

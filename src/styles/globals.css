@@ -895,6 +895,18 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 /* Telefoon: de zijbalk wordt een balk bovenin met de menuknop van de website,
    en wat naast elkaar stond komt onder elkaar */
 @media (max-width: 768px) {
+
+  :root {
+  --space5: 5px;
+  --space10: 10px;
+  --space15: 15px;
+  --space20: 20px;
+  --space30: 30px;
+  --space40: 30px;
+  --space50: 30px;
+  --space100: 50px;
+}
+  
   .layout {flex-direction: column;}
   .sidebar, .sidebar.collapsed {width: 100%; height: auto; z-index: 20; border-right: 0; border-bottom: 1px solid var(--border-color);}
   .sidebar.open {height: 100dvh;}

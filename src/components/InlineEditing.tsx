@@ -171,13 +171,15 @@ type EditableTextProps = Omit<HTMLAttributes<HTMLElement>, 'onChange'> & {
   value: string;
   onChange: (value: string) => void;
   colSpan?: number;
+  /** Grijze tekst zolang het veld leeg is, zodat je ziet dat je er iets kunt typen */
+  placeholder?: string;
 };
 
 /**
  * Een stukje platte tekst dat je op het papier aanpast: een kop, een titel,
  * een omschrijving in de prijstabel. Enter maakt er geen tweede regel van.
  */
-export function EditableText({ as: Tag = 'span', field, value, onChange, onKeyDown, ...rest }: EditableTextProps) {
+export function EditableText({ as: Tag = 'span', field, value, onChange, onKeyDown, placeholder, ...rest }: EditableTextProps) {
   const ref = useRef<HTMLElement>(null);
   const editing = useContext(InlineEditContext);
   // Wat we zelf als laatste hebben doorgegeven; dat staat er al
@@ -200,6 +202,8 @@ export function EditableText({ as: Tag = 'span', field, value, onChange, onKeyDo
       {...rest}
       ref={ref}
       data-bewerk={field}
+      data-placeholder={placeholder}
+      data-leeg={placeholder && !value ? '1' : undefined}
       contentEditable
       suppressContentEditableWarning
       onInput={() => {

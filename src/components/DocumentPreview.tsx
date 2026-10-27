@@ -1225,6 +1225,7 @@ export default function DocumentPreview({
         as={as}
         field={fieldKeys.title(blok)}
         value={block.title}
+        placeholder="Titel toevoegen"
         onFocus={() => {
           if (selected?.block !== blok) onSelect?.({ block: blok });
         }}

@@ -496,6 +496,7 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 
 .rich-editor .editable {min-height: 220px; padding: var(--space15); box-sizing: border-box; outline: 0; overflow-y: auto; color: var(--font-color1); line-height: 1.85em;}
 .rich-editor .editable.empty::before {content: attr(data-placeholder); color: var(--font-color2); pointer-events: none;}
+[data-bewerk][data-leeg]::before {content: attr(data-placeholder); color: var(--font-color2); pointer-events: none;}
 
 .rich-editor .editable > *:first-child, .rich-text > *:first-child {margin-top: 0;}
 .rich-editor .editable > *:last-child, .rich-text > *:last-child {margin-bottom: 0;}

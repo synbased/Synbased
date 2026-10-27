@@ -186,6 +186,13 @@ function parseAmount(text: string): number {
  * aantal. Je ziet het opgemaakt ("€ 12,50"), en bij het aanklikken het kale
  * getal ("12,5"), klaar om over te typen.
  */
+/**
+ * Wat er in een prijsveld getypt wordt, per veld. Bij het typen wordt het vel
+ * opnieuw ingedeeld; staat de regel op een volgend vel, dan wordt de cel even
+ * opnieuw opgebouwd. Hier bewaard gaat de getypte tekst daarbij niet verloren.
+ */
+const priceDrafts = new Map<string, string>();
+
 function PriceCell({
   field,
   price,
@@ -199,7 +206,7 @@ function PriceCell({
   display: string;
   onChange: (price: number) => void;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(() => priceDrafts.get(field) ?? null);
 
   // Bij het aanklikken staat het hele getal geselecteerd, klaar om over te typen
   const startedEditing = useRef(false);
@@ -222,11 +229,27 @@ function PriceCell({
       field={field}
       value={draft ?? display}
       onFocus={() => {
+        // Opnieuw opgebouwd terwijl je typt: de cursor komt vanzelf terug, en
+        // wat je al getypt had blijft staan
+        const typed = priceDrafts.get(field);
+        if (typed !== undefined) {
+          setDraft(typed);
+          return;
+        }
         startedEditing.current = true;
-        setDraft(String(price).replace('.', ','));
+        const start = String(price).replace('.', ',');
+        priceDrafts.set(field, start);
+        setDraft(start);
       }}
-      onBlur={() => setDraft(null)}
+      onBlur={() => {
+        setDraft(null);
+        // Pas weg als de cursor niet in een nieuwe versie van deze cel staat
+        setTimeout(() => {
+          if ((document.activeElement as HTMLElement | null)?.dataset?.bewerk !== field) priceDrafts.delete(field);
+        });
+      }}
       onChange={(text) => {
+        priceDrafts.set(field, text);
         setDraft(text);
         onChange(parseAmount(text));
       }}

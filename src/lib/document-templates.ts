@@ -58,6 +58,8 @@ const styles = (invoice: boolean) => `
 .document-page .product-table th {padding: 2mm 3mm; font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #7f7f7f; background: #fcfcfc; border-bottom: 1px solid #efefef;}
 .document-page .product-table tr td {padding: 2.2mm 3mm; font-size: 9pt; color: #000; border-bottom: 1px solid #efefef;}
 .document-page .product-table th:last-child, .document-page .product-table td:last-child {text-align: right; white-space: nowrap;}
+/* Een tussenkop is één cel over de hele breedte: die staat links, als de omschrijvingen */
+.document-page .product-table tr[data-kop] td {text-align: left; white-space: normal;}
 .document-page .invoice-total {width: 75mm; margin: 4mm 0 7mm auto;}
 .document-page .invoice-total-row {display: flex; justify-content: space-between; gap: 6mm; padding: 1mm 3mm; color: #7f7f7f;}
 .document-page .invoice-total-row.total-final {margin: 1.5mm 0 0 0; padding-top: 2.5mm; border-top: 1px solid #000; color: #000; font-weight: 600;}

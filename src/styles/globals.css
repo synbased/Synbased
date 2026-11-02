@@ -668,6 +668,7 @@ h1 .help:hover, h2 .help:hover, h3 .help:hover {background: var(--color4); color
 
 /* Een mail omzetten naar een offerte: het voorstel van de AI om te controleren */
 .modal:has(.quote-from-mail) {max-width: 760px;}
+.modal:has(.send-mail) {max-width: 640px;}
 .quote-from-mail {max-height: 72vh; overflow-y: auto; overflow-x: hidden; padding: 0 var(--space5) var(--space5) 0; color: var(--font-color1);}
 .quote-from-mail h3 {padding: 0 0 var(--space10) 0; margin: var(--space20) 0 var(--space10) 0; border-bottom: 1px solid var(--border-color);}
 .quote-from-mail .form-section .form-group textarea {min-height: 90px;}

@@ -1,7 +1,7 @@
 import type { Customer, Invoice, Quote, Tenant } from './supabase';
 import { canRequestPayment, formatIban, invoiceReference } from './payment';
 import { getCustomerDisplayName } from './utils';
-import { toDisplayHtml } from './richtext';
+import { isRichTextEmpty, toDisplayHtml } from './richtext';
 
 /**
  * Het adres waarop de app bereikbaar is. De knop in de mail moet een volledige
@@ -40,6 +40,13 @@ interface QuoteEmailInput {
   customer: Customer;
   quote: Pick<Quote, 'quote_number' | 'valid_until'>;
   token: string;
+  /** De tekst zoals de gebruiker hem voor deze ene mail aanpaste; anders die uit Instellingen */
+  intro?: string | null;
+}
+
+/** Een eigen tekst voor deze mail, opgeschoond; leeg is "geen eigen tekst" */
+function ownIntro(intro?: string | null): string | null {
+  return intro && !isRichTextEmpty(intro) ? toDisplayHtml(intro) : null;
 }
 
 /**
@@ -119,20 +126,23 @@ export function emailLayout({ top, content, button, note, footer }: EmailLayout)
 </html>`;
 }
 
+/** De tekst boven de knop in de offertemail: die uit Instellingen, of een vaste */
+export function quoteEmailIntro(tenant: Tenant, customer: Partial<Customer>): string {
+  return tenant.quote_email_intro_text
+    ? toDisplayHtml(tenant.quote_email_intro_text)
+    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
+       <p>Hierbij ontvangt u onze offerte. U kunt hem hieronder bekijken en direct ondertekenen.</p>`;
+}
+
 /**
  * De mail waarmee een offerte de deur uit gaat: bovenin het logo van de
  * aannemer, daaronder zijn eigen tekst uit Instellingen, en een knop naar de
  * offerte.
  */
-export function buildQuoteEmailHtml({ tenant, customer, quote, token }: QuoteEmailInput): string {
-  const intro = tenant.quote_email_intro_text
-    ? toDisplayHtml(tenant.quote_email_intro_text)
-    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u onze offerte. U kunt hem hieronder bekijken en direct ondertekenen.</p>`;
-
+export function buildQuoteEmailHtml({ tenant, customer, quote, token, intro }: QuoteEmailInput): string {
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: intro,
+    content: ownIntro(intro) ?? quoteEmailIntro(tenant, customer),
     button: { label: 'Offerte bekijken en ondertekenen', url: quoteLink(token) },
     note: validUntilNote(quote),
     footer: tenantFooter(tenant),
@@ -224,6 +234,17 @@ function invoicePaymentBlock(tenant: Tenant, invoice: InvoiceEmailInvoice): stri
       </table>`;
 }
 
+/** De tekst boven de betaalgegevens in de factuurmail: die uit Instellingen, of een vaste */
+export function invoiceEmailIntro(tenant: Tenant, customer: Partial<Customer>, invoice: Pick<Invoice, 'total'>): string {
+  const amountText = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
+    Number(invoice.total) || 0
+  );
+  return tenant.invoice_email_intro_text
+    ? toDisplayHtml(tenant.invoice_email_intro_text)
+    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
+       <p>Hierbij ontvangt u onze factuur van ${escapeHtml(amountText)}. U kunt hem hieronder bekijken en betalen.</p>`;
+}
+
 /**
  * De mail waarmee een factuur de deur uit gaat: logo, de eigen tekst uit
  * Instellingen, daaronder de betaalgegevens met de QR-code voor de bank-app,
@@ -234,23 +255,17 @@ export function buildInvoiceEmailHtml({
   tenant,
   customer,
   invoice,
+  intro,
 }: {
   tenant: Tenant;
   customer: Customer;
   invoice: InvoiceEmailInvoice;
+  /** De tekst zoals de gebruiker hem voor deze ene mail aanpaste */
+  intro?: string | null;
 }): string {
-  const amountText = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
-    Number(invoice.total) || 0
-  );
-
-  const intro = tenant.invoice_email_intro_text
-    ? toDisplayHtml(tenant.invoice_email_intro_text)
-    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u onze factuur van ${escapeHtml(amountText)}. U kunt hem hieronder bekijken en betalen.</p>`;
-
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: intro + invoicePaymentBlock(tenant, invoice),
+    content: (ownIntro(intro) ?? invoiceEmailIntro(tenant, customer, invoice)) + invoicePaymentBlock(tenant, invoice),
     button: { label: 'Factuur bekijken en betalen', url: invoiceLink(invoice.public_token || '') },
     footer: tenantFooter(tenant),
   });
@@ -302,6 +317,17 @@ export function buildInvoiceReminderEmailSubject(
   return `${count > 1 ? 'Tweede herinnering' : 'Herinnering'}: ${buildInvoiceEmailSubject(tenant, invoice, customer)}`;
 }
 
+/** De vaste tekst van de mail bij een creditfactuur */
+export function creditNoteEmailIntro(customer: Partial<Customer>, invoice: Pick<Invoice, 'total'>, originalNumber?: string | null): string {
+  const amountText = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
+    Math.abs(Number(invoice.total) || 0)
+  );
+  return `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
+       <p>Hierbij ontvangt u een creditfactuur van ${escapeHtml(amountText)}${
+         originalNumber ? ` voor factuur ${escapeHtml(originalNumber)}` : ''
+       }. U kunt hem hieronder bekijken.</p>`;
+}
+
 /**
  * De mail bij een creditfactuur: dezelfde opzet als de factuurmail, maar
  * zonder betaalgegevens, en met het nummer van de factuur die hij corrigeert.
@@ -311,22 +337,18 @@ export function buildCreditNoteEmailHtml({
   customer,
   invoice,
   originalNumber,
+  intro,
 }: {
   tenant: Tenant;
   customer: Customer;
   invoice: Pick<Invoice, 'total' | 'public_token'>;
   originalNumber?: string | null;
+  /** De tekst zoals de gebruiker hem voor deze ene mail aanpaste */
+  intro?: string | null;
 }): string {
-  const amountText = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
-    Math.abs(Number(invoice.total) || 0)
-  );
-
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u een creditfactuur van ${escapeHtml(amountText)}${
-         originalNumber ? ` voor factuur ${escapeHtml(originalNumber)}` : ''
-       }. U kunt hem hieronder bekijken.</p>`,
+    content: ownIntro(intro) ?? creditNoteEmailIntro(customer, invoice, originalNumber),
     button: { label: 'Creditfactuur bekijken', url: invoiceLink(invoice.public_token || '') },
     footer: tenantFooter(tenant),
   });

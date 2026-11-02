@@ -8,6 +8,7 @@ import Layout from '@/components/Layout';
 import { useToast } from '@/components/Toast';
 import Select from '@/components/Select';
 import DatePicker from '@/components/DatePicker';
+import SendMail from '@/components/SendMail';
 import DocumentEditor from '@/components/DocumentEditor';
 import type { SignatureState } from '@/components/DocumentPreview';
 import type { Customer, DocumentBlock } from '@/lib/supabase';
@@ -60,6 +61,7 @@ export default function EditQuote() {
   const [isLoading, setIsLoading] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const [signature, setSignature] = useState<SignatureState | null>(null);
   // Wanneer de klant de verstuurde offerte voor het eerst opende
   const [viewedAt, setViewedAt] = useState<string | null>(null);
@@ -198,42 +200,27 @@ export default function EditQuote() {
     window.location.href = `/api/quotes/${id}/pdf`;
   };
 
+  // Eerst het openstaande werk vastleggen, anders krijgt de klant een oudere
+  // versie te zien; daarna de mail om te bekijken en eventueel aan te passen
   const handleSend = async () => {
-    const confirmed = await confirm({
-      title: 'Offerte versturen',
-      message:
-        'De klant krijgt een mail met een knop naar deze offerte, waar hij hem kan bekijken en ondertekenen.',
-      confirmText: 'Versturen',
-      cancelText: 'Annuleren',
-    });
-
-    if (!confirmed) return;
-
     setIsSending(true);
-
     try {
-      // Eerst het openstaande werk vastleggen, anders krijgt de klant een
-      // oudere versie te zien dan wat er op het scherm staat
       await persist(formData, true);
-
-      const response = await fetch(`/api/quotes/${id}/send`, { method: 'POST' });
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error('Versturen mislukt', data.error || 'Er is iets misgegaan');
-        return;
-      }
-
-      toast.success(
-        'Verstuurd',
-        `De offerte is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
-      );
-      setFormData((current) => ({ ...current, status: 'sent' }));
-    } catch (err) {
-      toast.error('Versturen mislukt', 'Er is iets misgegaan. Probeer het opnieuw.');
+      setSendOpen(true);
+    } catch (err: any) {
+      toast.error('Versturen mislukt', err.message || 'Er is iets misgegaan. Probeer het opnieuw.');
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSent = (data: any) => {
+    setSendOpen(false);
+    toast.success(
+      'Verstuurd',
+      `De offerte is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
+    );
+    setFormData((current) => ({ ...current, status: current.status === 'draft' ? 'sent' : current.status }));
   };
 
   const handleConvertToInvoice = async () => {
@@ -444,6 +431,14 @@ export default function EditQuote() {
         }
       />
 
+      <SendMail
+        isOpen={sendOpen}
+        title="Offerte versturen"
+        endpoint={`/api/quotes/${id}/send`}
+        note="Onder je tekst komt de knop waarmee de klant de offerte bekijkt en ondertekent."
+        onClose={() => setSendOpen(false)}
+        onSent={handleSent}
+      />
     </Layout>
   );
 }

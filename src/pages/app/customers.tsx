@@ -5,9 +5,10 @@ import Table from '@/components/Table';
 import Pagination from '@/components/Pagination';
 import SelectionBar from '@/components/SelectionBar';
 import ToolButton from '@/components/ToolButton';
+import SearchInput from '@/components/SearchInput';
 import { usePagination } from '@/hooks/usePagination';
 import Link from 'next/link';
-import { Ellipsis, Check, Trash2 } from 'lucide-react';
+import { Ellipsis, Check, Trash2, Search, Users } from 'lucide-react';
 import type { Customer } from '@/lib/supabase';
 import { useConfirm } from '@/hooks/useConfirm';
 import { getCustomerDisplayName } from '@/lib/utils';
@@ -16,8 +17,18 @@ import { SkeletonTable } from '@/components/Skeleton';
 export default function Customers() {
   const { confirm } = useConfirm();
   const [customers, setCustomers] = useState<Customer[]>([]);
-  // Lange lijsten in pagina's; de selectie en het verwijderen gaan over de hele lijst
-  const pagination = usePagination(customers);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Zoeken op naam, bedrijf, klantnummer, e-mail, telefoon en plaats
+  const term = searchTerm.trim().toLowerCase();
+  const filtered = term
+    ? customers.filter((customer) =>
+        [getCustomerDisplayName(customer), customer.company_name, customer.customer_number, customer.email, customer.phone, customer.city]
+          .some(value => String(value || '').toLowerCase().includes(term))
+      )
+    : customers;
+  // Lange lijsten in pagina's; selecteren gaat over wat er gevonden is
+  const pagination = usePagination(filtered);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,10 +80,10 @@ export default function Customers() {
   };
 
   const handleSelectAll = () => {
-    if (selectedIds.length === customers.length) {
+    if (selectedIds.length === filtered.length) {
       setSelectedIds([]);
     } else {
-      setSelectedIds(customers.map(c => c.id));
+      setSelectedIds(filtered.map(c => c.id));
     }
   };
 
@@ -146,16 +157,22 @@ export default function Customers() {
       <div className="header">
         <h1>Klanten <HelpButton topic="customers" /></h1>
         <div className="actions">
+          <SearchInput value={searchTerm} label="Zoeken in klanten" onChange={setSearchTerm} />
           <Link href="/app/customers/new" className="button">
             Klant toevoegen
           </Link>
         </div>
       </div>
 
-      {customers.length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="empty-state">
-          <h2>Geen klanten</h2>
-          <p>Je hebt nog geen klanten toegevoegd. Begin met het toevoegen van je eerste klant.</p>
+          {searchTerm ? <Search size={22} /> : <Users size={22} />}
+          <h2>{searchTerm ? 'Geen klanten gevonden' : 'Geen klanten'}</h2>
+          <p>
+            {searchTerm
+              ? 'Probeer een andere zoekterm.'
+              : 'Je hebt nog geen klanten toegevoegd. Begin met het toevoegen van je eerste klant.'}
+          </p>
         </div>
       ) : (
         <>
@@ -167,14 +184,14 @@ export default function Customers() {
               role="checkbox"
               className="checkbox"
               aria-checked={
-                selectedIds.length === customers.length
+                selectedIds.length === filtered.length
                   ? true
                   : selectedIds.length === 0
                     ? false
                     : "mixed"
               }
               data-state={
-                selectedIds.length === customers.length
+                selectedIds.length === filtered.length
                   ? "checked"
                   : selectedIds.length === 0
                     ? "unchecked"

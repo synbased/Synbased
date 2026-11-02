@@ -10,6 +10,7 @@ import { useToast } from '@/components/Toast';
 import Select from '@/components/Select';
 import DatePicker from '@/components/DatePicker';
 import DocumentEditor from '@/components/DocumentEditor';
+import SendMail from '@/components/SendMail';
 import { useMailAccount } from '@/hooks/useMailAccount';
 import { useConfirm } from '@/hooks/useConfirm';
 import { invoiceReference } from '@/lib/payment';
@@ -53,6 +54,7 @@ export default function EditInvoice() {
   // Versturen gaat via de eigen Gmail of Outlook; zonder koppeling is er geen knop
   const mailAccount = useMailAccount();
   const [isSending, setIsSending] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const [isMarking, setIsMarking] = useState(false);
   const [isCrediting, setIsCrediting] = useState(false);
   const [paidAt, setPaidAt] = useState<string | null>(null);
@@ -195,39 +197,19 @@ export default function EditInvoice() {
     if (await save()) window.location.href = `/api/invoices/${id}/pdf`;
   };
 
+  // Eerst vastleggen, anders krijgt de klant een oudere versie te zien; daarna
+  // de mail om te bekijken en eventueel aan te passen
   const handleSend = async () => {
-    const confirmed = await confirm({
-      title: `${title} versturen`,
-      message: isFinal
-        ? `De klant krijgt de ${title.toLowerCase()} nog een keer per mail.`
-        : creditFor
-          ? `De klant krijgt een mail met een knop naar deze creditfactuur. ${FINAL_NOTE}`
-          : `De klant krijgt een mail met de betaalgegevens en QR-code, en een knop naar deze factuur om hem te bekijken en te betalen. ${FINAL_NOTE}`,
-      confirmText: 'Versturen',
-      cancelText: 'Annuleren',
-    });
-    if (!confirmed) return;
-
     setIsSending(true);
-    try {
-      // Eerst vastleggen, anders krijgt de klant een oudere versie te zien
-      if (!(await save())) return;
+    if (await save()) setSendOpen(true);
+    setIsSending(false);
+  };
 
-      const response = await fetch(`/api/invoices/${id}/send`, { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok) {
-        toast.error('Versturen mislukt', data.error || 'Er is iets misgegaan');
-        return;
-      }
-
-      toast.success('Verstuurd', `De ${title.toLowerCase()} is naar ${data.to} gestuurd`);
-      // Opnieuw ophalen: bij het versturen heeft hij zijn nummer gekregen
-      fetchInvoice();
-    } catch {
-      toast.error('Versturen mislukt', 'Er is iets misgegaan. Probeer het opnieuw.');
-    } finally {
-      setIsSending(false);
-    }
+  const handleSent = (data: any) => {
+    setSendOpen(false);
+    toast.success('Verstuurd', `De ${title.toLowerCase()} is naar ${data.to} gestuurd`);
+    // Opnieuw ophalen: bij het versturen heeft hij zijn nummer gekregen
+    fetchInvoice();
   };
 
   /** Zelf verstuurd, bijvoorbeeld de PDF in een eigen mail: dan ligt hij ook vast */
@@ -506,6 +488,18 @@ export default function EditInvoice() {
         }
       />
 
+      <SendMail
+        isOpen={sendOpen}
+        title={`${title} versturen`}
+        endpoint={`/api/invoices/${id}/send`}
+        note={
+          creditFor
+            ? `Onder je tekst komt de knop naar de creditfactuur.${isFinal ? '' : ' Na het versturen krijgt hij zijn nummer en ligt hij vast.'}`
+            : `Onder je tekst komen de betaalgegevens met de QR-code en de knop naar de factuur.${isFinal ? '' : ' Na het versturen krijgt hij zijn nummer en ligt hij vast; corrigeren gaat dan met een creditfactuur.'}`
+        }
+        onClose={() => setSendOpen(false)}
+        onSent={handleSent}
+      />
     </Layout>
   );
 }

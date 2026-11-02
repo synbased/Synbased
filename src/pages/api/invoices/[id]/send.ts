@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { assignInvoiceNumber, getInvoice, getTenant, updateInvoice } from '@/lib/db';
-import { buildCreditNoteEmailHtml, buildInvoiceEmailHtml, buildInvoiceEmailSubject } from '@/lib/email';
+import { buildCreditNoteEmailHtml, buildInvoiceEmailHtml, buildInvoiceEmailSubject, creditNoteEmailIntro, fillSubjectTags, invoiceEmailIntro } from '@/lib/email';
 import { isCreditNote } from '@/lib/invoices';
 import { MailAuthError, getMailAccount, openMailbox } from '@/lib/mail';
 
@@ -12,9 +12,13 @@ import { MailAuthError, getMailAccount, openMailbox } from '@/lib/mail';
  *
  * Net als bij offertes via de Gmail of Outlook die de gebruiker bij Plug-ins
  * heeft gekoppeld: vanaf zijn eigen adres, en hij staat in zijn Verzonden.
+ *
+ * GET geeft de mail zoals hij zou gaan (aan wie, onderwerp en tekst), zodat de
+ * gebruiker hem voor deze ene factuur kan aanpassen. POST verstuurt hem, met
+ * { subject, intro } als die aangepast zijn.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const session = await getServerSession(req, res, authOptions);
   if (!session) return res.status(401).json({ error: 'Unauthorized' });
@@ -35,6 +39,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!invoice.public_token) {
       return res.status(500).json({ error: 'Deze factuur heeft geen sleutel. Draai MIGRATION.sql in de Supabase SQL-editor.' });
     }
+    // Een concept krijgt zijn nummer pas bij het versturen; tot dan staat de tag
+    // in het onderwerp, en die wordt bij het versturen ingevuld
+    if (req.method === 'GET') {
+      const number = invoice.invoice_number || '{{factuurnummer}}';
+      return res.status(200).json({
+        to: customer.email,
+        subject: isCreditNote(invoice)
+          ? `Creditfactuur ${number}`
+          : buildInvoiceEmailSubject(tenant, { invoice_number: number }, customer),
+        intro: isCreditNote(invoice)
+          ? creditNoteEmailIntro(customer, invoice, invoice.credit_for?.invoice_number)
+          : invoiceEmailIntro(tenant, customer, invoice),
+      });
+    }
+
     if (!(await getMailAccount(userId))) {
       return res.status(400).json({
         error: 'Koppel eerst je Gmail of Outlook bij Instellingen > Plug-ins; facturen gaan vanuit je eigen mailbox.',
@@ -46,12 +65,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     invoice.invoice_number = await assignInvoiceNumber(id, tenantId);
 
     // Een creditfactuur heeft een eigen mail, zonder betaalgegevens
-    const subject = isCreditNote(invoice)
-      ? `Creditfactuur ${invoice.invoice_number || ''}`.trim()
-      : buildInvoiceEmailSubject(tenant, invoice, customer);
+    const ownSubject = String(req.body?.subject || '').trim();
+    const subject = ownSubject
+      ? fillSubjectTags(ownSubject, { factuurnummer: invoice.invoice_number || '' })
+      : isCreditNote(invoice)
+        ? `Creditfactuur ${invoice.invoice_number || ''}`.trim()
+        : buildInvoiceEmailSubject(tenant, invoice, customer);
+    const intro = typeof req.body?.intro === 'string' ? req.body.intro : null;
     const html = isCreditNote(invoice)
-      ? buildCreditNoteEmailHtml({ tenant, customer, invoice, originalNumber: invoice.credit_for?.invoice_number })
-      : buildInvoiceEmailHtml({ tenant, customer, invoice });
+      ? buildCreditNoteEmailHtml({ tenant, customer, invoice, originalNumber: invoice.credit_for?.invoice_number, intro })
+      : buildInvoiceEmailHtml({ tenant, customer, invoice, intro });
 
     try {
       const mailbox = await openMailbox(userId);

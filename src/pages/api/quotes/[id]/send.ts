@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]';
 import { getQuote, getTenant, updateQuote } from '@/lib/db';
-import { buildQuoteEmailHtml, buildQuoteEmailSubject, quoteLink } from '@/lib/email';
+import { buildQuoteEmailHtml, buildQuoteEmailSubject, quoteEmailIntro, quoteLink } from '@/lib/email';
 import { MailAuthError, getMailAccount, openMailbox } from '@/lib/mail';
 
 /**
@@ -13,10 +13,14 @@ import { MailAuthError, getMailAccount, openMailbox } from '@/lib/mail';
  * gekoppeld: vanaf zijn eigen adres, en hij staat ook in zijn Verzonden. Een
  * antwoord van de klant komt gewoon in zijn Inbox. Zonder koppeling kan er
  * niet verstuurd worden; het scherm laat de knop dan ook niet zien.
+ *
+ * GET geeft de mail zoals hij zou gaan (aan wie, onderwerp en tekst), zodat de
+ * gebruiker hem voor deze ene offerte kan aanpassen. POST verstuurt hem, met
+ * { subject, intro } als die aangepast zijn.
  */
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
+  if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -49,8 +53,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(500).json({ error: 'Deze offerte heeft geen sleutel. Draai MIGRATION.sql in de Supabase SQL-editor.' });
     }
 
-    const subject = buildQuoteEmailSubject(tenant, quote, customer);
-    const html = buildQuoteEmailHtml({ tenant, customer, quote, token: quote.public_token });
+    if (req.method === 'GET') {
+      return res.status(200).json({
+        to: customer.email,
+        subject: buildQuoteEmailSubject(tenant, quote, customer),
+        intro: quoteEmailIntro(tenant, customer),
+      });
+    }
+
+    const subject = String(req.body?.subject || '').trim() || buildQuoteEmailSubject(tenant, quote, customer);
+    const intro = typeof req.body?.intro === 'string' ? req.body.intro : null;
+    const html = buildQuoteEmailHtml({ tenant, customer, quote, token: quote.public_token, intro });
 
     const mailAccount = await getMailAccount(userId);
     if (!mailAccount) {

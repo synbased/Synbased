@@ -805,7 +805,21 @@ function zoekKnip(pagina: HTMLElement, slot: HTMLElement, schaal: number): Knip 
     rechts += parseFloat(stijl.paddingRight) || 0;
   }
 
-  const grensOnder = vel.bottom - onder * schaal;
+  // Wat het sjabloon onder het vak zet, zoals het eindtotaal, moet er ook nog
+  // op. Alleen wat eronder staat telt, niet een zijbalk ernaast
+  const vak = slot.getBoundingClientRect();
+  let eronder = 0;
+  for (let el: HTMLElement | null = slot; el && el !== pagina; el = el.parentElement) {
+    for (let volgend = el.nextElementSibling; volgend; volgend = volgend.nextElementSibling) {
+      const stijl = getComputedStyle(volgend);
+      if (stijl.display === 'none' || stijl.position === 'absolute' || stijl.position === 'fixed') continue;
+      const r = volgend.getBoundingClientRect();
+      if (r.height === 0 || r.right <= vak.left || r.left >= vak.right || r.top < vak.top) continue;
+      eronder += r.height + ((parseFloat(stijl.marginTop) || 0) + (parseFloat(stijl.marginBottom) || 0)) * schaal;
+    }
+  }
+
+  const grensOnder = vel.bottom - onder * schaal - eronder;
   const grensRechts = vel.right - rechts * schaal;
 
   const past = (el: Element) => {

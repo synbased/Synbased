@@ -7,22 +7,18 @@ import { AiKeyError, QuoteProposalSchema, ReceiptReadingSchema, type AiProvider 
  * Google Gemini, met de sleutel van de gebruiker zelf. Via Google AI Studio is
  * er een gratis laag, dus hiermee is de functie zonder kosten uit te proberen.
  *
- * gemini-flash-latest wijst altijd naar het huidige Flash-model; met
- * GEMINI_MODEL kies je zelf een vast model.
+ * Flash-Lite voor alles: offertes uit een mail en bonnen. Gemeten met een
+ * offerte-aanvraag: rond 1,5 seconde met een goed voorstel, terwijl het
+ * gewone Flash-model 44 seconden deed over "overbelast". Op een bon hetzelfde
+ * beeld: 1,5 tegen 26 seconden. De -latest-namen volgen vanzelf de nieuwste
+ * versie; vaste versies zoals 2.5 verdwijnen voor nieuwe gebruikers. Met
+ * GEMINI_MODEL en GEMINI_RECEIPT_MODEL kies je zelf een model.
  */
-const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-
-/**
- * Voor bonnen: Flash-Lite. Gemeten op een kassabon: rond 1,5 seconde en goed
- * gelezen, tegen 26 seconden voor Flash met standaard nadenken. De -latest-
- * namen volgen vanzelf de nieuwste versie; vaste versies zoals 2.5 verdwijnen
- * voor nieuwe gebruikers. Met GEMINI_RECEIPT_MODEL kies je zelf een model.
- */
+const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
 const RECEIPT_MODEL = process.env.GEMINI_RECEIPT_MODEL || 'gemini-flash-lite-latest';
 
-/** Is het eerste model overbelast, dan het andere: Lite en Flash vangen elkaar op */
-const FALLBACK_MODEL = 'gemini-flash-lite-latest';
-const RECEIPT_FALLBACK_MODEL = 'gemini-flash-latest';
+/** Is Flash-Lite overbelast, dan het gewone Flash-model als reserve */
+const FALLBACK_MODEL = 'gemini-flash-latest';
 
 /** Zo lang wachten voor een volgende poging, in milliseconden */
 const RETRY_DELAYS = [800, 2000];
@@ -41,8 +37,8 @@ const isTemporary = (error: unknown) => error instanceof ApiError && [500, 502, 
 
 /**
  * Een vraag aan Gemini, met een paar pogingen als Google even overbelast is
- * (503). Blijft het nieuwste Flash-model overbelast, dan nog één keer met een
- * vast model. Wie zelf GEMINI_MODEL instelt, blijft bij dat model.
+ * (503). Blijft het overbelast, dan nog één keer met het reservemodel. Wie
+ * zelf GEMINI_MODEL instelt, blijft bij dat model.
  */
 async function withRetries<T>(
   ask: (model: string) => Promise<T>,
@@ -195,7 +191,7 @@ export const gemini: AiProvider = {
     // In de logs van Vercel: welk model en hoe lang, zodat traagheid te vinden is
     const started = Date.now();
     try {
-      const response = await withRetries(readWithoutThinking, RECEIPT_MODEL, process.env.GEMINI_RECEIPT_MODEL ? null : RECEIPT_FALLBACK_MODEL);
+      const response = await withRetries(readWithoutThinking, RECEIPT_MODEL, process.env.GEMINI_RECEIPT_MODEL ? null : FALLBACK_MODEL);
       console.log(`[gemini] bon gelezen met ${usedModel} in ${Date.now() - started} ms`);
 
       const parsed = ReceiptReadingSchema.safeParse(JSON.parse(response.text || 'null'));

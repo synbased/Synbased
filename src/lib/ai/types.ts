@@ -37,6 +37,10 @@ export const QuoteProposalSchema = z.object({
         price: z.number().nullable(),
         /** Waar de prijs vandaan komt, zoals "Offerte 2026-0012: € 42 per m²" */
         price_basis: z.string(),
+        /** De tussenkop waar de regel onder valt, zoals "Sloopwerk"; leeg bij één onderdeel */
+        section: z.string(),
+        /** Het btw-tarief: 21, of 9 voor bijvoorbeeld schilderwerk aan een woning ouder dan 2 jaar */
+        vat_rate: z.number(),
       })
     ),
   }),
@@ -72,6 +76,14 @@ export interface QuoteRequestInput {
   /** De klant als die al bekend is, op e-mailadres gevonden; bij WhatsApp zoeken we pas achteraf */
   knownCustomer: Record<string, string> | null;
   pastLines: PastQuoteLine[];
+  /** Hoe dit bedrijf zijn offertes opstelt, als het er al een heeft */
+  example?: QuoteExample | null;
+}
+
+/** De stijl van eerdere offertes: de inleiding van de laatste, en de tussenkoppen die vaak terugkomen */
+export interface QuoteExample {
+  intro: string;
+  sections: string[];
 }
 
 /**

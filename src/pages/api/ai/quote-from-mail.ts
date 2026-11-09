@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]';
-import { AiKeyError, openAi, pastQuoteLines, threadToTranscript } from '@/lib/ai';
+import { AiKeyError, openAi, pastQuoteLines, threadToTranscript, quoteLayout } from '@/lib/ai';
 import { openMailbox, sendMailError } from '@/lib/mail';
 import { getTenant } from '@/lib/db';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -75,7 +75,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .maybeSingle()
       : { data: null };
 
-    const [tenant, pastLines] = await Promise.all([getTenant(user.tenantId), pastQuoteLines(user.tenantId)]);
+    const [tenant, pastLines, layout] = await Promise.all([
+      getTenant(user.tenantId),
+      pastQuoteLines(user.tenantId),
+      quoteLayout(user.tenantId),
+    ]);
 
     const proposal = await ai.provider.proposeQuote(ai.apiKey, {
       source: 'mail',
@@ -86,6 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? Object.fromEntries(CUSTOMER_FIELDS.map(field => [field, known[field] || '']))
         : null,
       pastLines,
+      example: layout?.example ?? null,
     });
 
     // Het adres van de afzender is zeker; dat hoeft de AI niet te raden
@@ -95,6 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       proposal,
       customer: known ? { id: known.id, name: getCustomerDisplayName(known) } : null,
       provider: ai.name,
+      // De opzet van de laatste offerte; de nieuwe krijgt dezelfde opbouw
+      layout: layout?.blocks.length ? layout.blocks : null,
     });
   } catch (error: any) {
     if (error instanceof AiKeyError) return res.status(409).json({ error: error.message, reconnect: true });

@@ -1,4 +1,5 @@
 import type { DocumentBlock, DocumentElement, ElementKind, LineItem } from './supabase';
+import { plainTextToRichText } from './richtext';
 
 /** De elementtypes die een blok mag bevatten, gelijk aan de CHECK in de database. */
 export const ELEMENT_KINDS: ElementKind[] = ['gegevens', 'kop', 'tekst', 'prijstabel', 'handtekening'];
@@ -132,4 +133,112 @@ export function validateBlocks(blocks: unknown): string | null {
   }
 
   return null;
+}
+
+/** Een regel uit een AI-voorstel, zoals de Inbox en de WhatsApp-bot hem doorgeven */
+export interface ProposalLine {
+  description: string;
+  quantity: number;
+  unit: string;
+  price?: number | null;
+  section?: string;
+  vat_rate?: number;
+}
+
+/**
+ * De blokken van een offerte uit een AI-voorstel, in de opzet van een eerdere
+ * offerte van het bedrijf. Die opzet (layout) geeft de pagina's, de teksten na
+ * de prijstabel, de handtekening en de instellingen van de prijstabel; de
+ * titel, de inleiding en de regels komen uit het voorstel. De regels staan per
+ * btw-tarief in een eigen prijstabel, met een tussenkop per onderdeel.
+ *
+ * Zonder eerdere offerte: gegevens, inleiding, prijstabel en handtekening.
+ */
+export function proposalBlocks(
+  proposal: { title: string; intro: string; items: ProposalLine[] },
+  layout?: DocumentBlock[] | null
+): DocumentBlock[] {
+  const title = proposal.title.trim() || 'Offerte';
+  const lines = proposal.items.filter(item => item.description.trim());
+  const introElement = proposal.intro.trim() ? [{ ...emptyElement('tekst'), body: plainTextToRichText(proposal.intro) }] : [];
+
+  // Een tussenkop zodra het onderdeel wisselt, als het voorstel onderdelen heeft
+  const withSections = lines.some(item => item.section?.trim());
+  const tables = (template?: DocumentElement): DocumentElement[] => {
+    const rates = [...new Set(lines.map(item => (item.vat_rate === 9 || item.vat_rate === 0 ? item.vat_rate : 21)))].sort((a, b) => b - a);
+    const groups = rates.length ? rates : [21];
+
+    return groups.map(rate => {
+      const rows: LineItem[] = [];
+      let section: string | null = null;
+      for (const item of lines.filter(line => (line.vat_rate === 9 || line.vat_rate === 0 ? line.vat_rate : 21) === rate)) {
+        const next = item.section?.trim() || '';
+        if (withSections && next && next !== section) rows.push({ ...emptyHeading(), description: next });
+        section = next;
+        rows.push({
+          description: item.description.trim(),
+          is_heading: false,
+          quantity: Number(item.quantity) || 1,
+          unit: item.unit.trim() || null,
+          price: Number(item.price) || 0,
+        });
+      }
+      if (rows.length === 0) rows.push({ ...emptyItem(), description: title });
+
+      const table = priceTable(rows);
+      return {
+        ...table,
+        tax_percentage: rate,
+        // Werkt het bedrijf met aantallen, dan ook hier
+        show_quantity: table.show_quantity || !!template?.show_quantity,
+      };
+    });
+  };
+
+  const main = (layout || []).findIndex(block => block.elements.some(element => element.kind === 'prijstabel'));
+  if (!layout || main < 0) {
+    return [{ title, elements: [emptyElement('gegevens'), ...introElement, ...tables(), emptyElement('handtekening')] }];
+  }
+
+  return layout.flatMap((block, index) => {
+    if (index !== main) {
+      // Andere pagina's, zoals de algemene voorwaarden, gaan mee; oude prijzen niet
+      const elements = block.elements.filter(element => element.kind !== 'prijstabel').map(duplicateElement);
+      return elements.length ? [{ title: block.title, elements }] : [];
+    }
+
+    const elements: DocumentElement[] = [];
+    let placedTables = false;
+    let placedIntro = false;
+    let placedTitle = false;
+
+    for (const element of block.elements) {
+      if (element.kind === 'prijstabel') {
+        if (placedTables) continue;
+        // De inleiding staat voor de prijstabel, ook als de vorige offerte er geen had
+        if (!placedIntro) elements.push(...introElement);
+        placedIntro = true;
+        elements.push(...tables(element));
+        placedTables = true;
+      } else if (!placedTables && element.kind === 'tekst') {
+        // De inleiding van de vorige klus wordt de nieuwe
+        if (!placedIntro) elements.push(...introElement);
+        placedIntro = true;
+      } else if (!placedTables && element.kind === 'kop') {
+        // Een kop boven de prijstabel ging over de vorige klus; de eerste wordt de titel
+        if (!placedTitle) elements.push({ ...duplicateElement(element), body: title });
+        placedTitle = true;
+      } else {
+        elements.push(duplicateElement(element));
+      }
+    }
+
+    // De klantgegevens bovenaan en een handtekening horen altijd op een offerte
+    if (!elements.some(element => element.kind === 'gegevens')) elements.unshift(emptyElement('gegevens'));
+    if (!layout.some(other => other.elements.some(element => element.kind === 'handtekening'))) {
+      elements.push(emptyElement('handtekening'));
+    }
+
+    return [{ title, elements }];
+  });
 }

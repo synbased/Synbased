@@ -18,8 +18,10 @@ Wat je teruggeeft:
 
 2. quote: een voorstel voor de offerte.
    - title: een korte titel van het werk, zoals "PVC visgraatvloer leggen".
-   - intro: twee of drie zinnen aan de klant, in de u-vorm, die het verzoek samenvatten. Geen aanhef en geen afsluiting.
-   - items: de regels zoals een vakman ze op een offerte zet, in logische volgorde: voorbereiding, materiaal, arbeid, afwerking. Gebruik een aantal en eenheid (zoals m², m¹, uur, stuks) als de mail een maat of hoeveelheid noemt, anders aantal 1 en een lege eenheid. Voeg geen regels toe voor werk waar de mail niet om vraagt, behalve wat er onvermijdelijk bij hoort (zoals ondervloer bij een nieuwe vloer).
+   - intro: twee of drie zinnen aan de klant, in de u-vorm, die het verzoek samenvatten. Geen aanhef en geen afsluiting. Staat er een inleiding van een eerdere offerte bij, volg dan die toon en lengte, maar neem niets over wat over die andere klus gaat.
+   - items: de regels zoals een vakman ze op een offerte zet, in logische volgorde: voorbereiding, materiaal, arbeid, afwerking. Gebruik een aantal en eenheid (zoals m², m¹, uur, stuks) als de mail een maat of hoeveelheid noemt, anders aantal 1 en een lege eenheid. Splits werk dat bij elkaar staat maar apart wordt uitgevoerd in aparte regels, zoals tegelwerk wand en tegelwerk vloer. Voeg geen regels toe voor werk waar de mail niet om vraagt, behalve wat er onvermijdelijk bij hoort (zoals ondervloer bij een nieuwe vloer).
+   - section: de tussenkop waar de regel onder valt, zoals "Sloopwerk", "Tegelwerk", "Sanitair en installatie" of "Afwerking". Gebruik de tussenkoppen die het bedrijf eerder gebruikte als ze passen. Regels van hetzelfde onderdeel krijgen precies dezelfde tussenkop en staan bij elkaar. Gaat de hele offerte over één onderdeel, laat section dan leeg.
+   - vat_rate: 21. Alleen 9 voor schilder-, stukadoors- en behangwerk aan een woning die ouder is dan twee jaar, als dat uit de mail blijkt. Bij twijfel 21.
    - price: alleen als er in de eerdere offerteregels werk staat dat duidelijk vergelijkbaar is. Neem dan die prijs per eenheid over en zet in price_basis waar hij vandaan komt, zoals "Offerte 2026-0012: € 42,00 per m²". Is er geen goede vergelijking, dan price null en price_basis leeg. Verzin nooit een prijs.
 
 3. missing: wat de aannemer nog nodig heeft om een goede offerte te maken, kort en concreet, zoals "Adres van de klus", "Oppervlakte in m²" of "Moet de oude vloer eruit?". Vraag niet naar wat al bekend is. Voor een nieuwe klant zonder adres hoort het adres erbij.
@@ -44,9 +46,10 @@ Wat je teruggeeft:
 
 2. quote: de offerte.
    - title: een korte titel van het werk, zoals "Keuken schilderen".
-   - intro: twee of drie zinnen aan de klant, in de u-vorm, die het werk samenvatten. Geen aanhef en geen afsluiting.
+   - intro: twee of drie zinnen aan de klant, in de u-vorm, die het werk samenvatten. Geen aanhef en geen afsluiting. Staat er een inleiding van een eerdere offerte bij, volg dan die toon en lengte, maar neem niets over wat over die andere klus gaat.
    - items: de regels zoals een vakman ze op een offerte zet, in logische volgorde: voorbereiding, materiaal, arbeid, afwerking. Neem de opgemeten maten over als aantal en eenheid (m², m¹, uur, stuks). Zonder maat: aantal 1 en een lege eenheid. Voeg geen werk toe waar het bericht niet om vraagt, behalve wat er onvermijdelijk bij hoort (zoals afplakken en schuren bij schilderwerk), en zet dan aantal en eenheid gelijk aan het werk waar het bij hoort.
    - price: noemt het bericht zelf een prijs, neem die dan over en zet in price_basis "Uit je bericht". Anders alleen als er in de eerdere offerteregels werk staat dat duidelijk vergelijkbaar is: neem die prijs per eenheid over en zet in price_basis waar hij vandaan komt, zoals "Offerte 2026-0012: € 18,50 per m²". Is er geen goede vergelijking, dan price null en price_basis leeg. Verzin nooit een prijs.
+   - section en vat_rate: zoals bij een mail. section is de tussenkop (zoals "Schilderwerk binnen"), met de tussenkoppen die het bedrijf eerder gebruikte als ze passen, en leeg als de offerte over één onderdeel gaat. vat_rate is 21, of 9 voor schilder-, stukadoors- en behangwerk aan een woning ouder dan twee jaar.
 
 3. missing: wat de aannemer nog moet aanvullen voor een goede offerte, kort en concreet, zoals "Prijs per m² muren", "Kleur en soort verf" of "Adres van de klant". Hooguit vijf punten, het belangrijkste eerst. Vraag niet naar wat al bekend is.
 
@@ -89,11 +92,20 @@ ${known}`;
 
   const tag = input.source === 'whatsapp' ? 'bericht' : 'mail';
 
+  // Zo stelt dit bedrijf zijn offertes op; de nieuwe moet daarbij passen
+  const example = input.example
+    ? `
+Zo stelt dit bedrijf zijn offertes op:
+- Tussenkoppen die het eerder gebruikte: ${input.example.sections.length ? input.example.sections.join(', ') : 'nog geen'}
+- Inleiding van de laatste offerte (alleen als voorbeeld voor toon en lengte): ${input.example.intro || 'geen'}
+`
+    : '';
+
   return `${header}
 
 Eerdere offerteregels van dit bedrijf (prijs per eenheid, excl. btw, nieuwste eerst):
 ${lines}
-
+${example}
 <${tag}>
 ${input.transcript}
 </${tag}>`;

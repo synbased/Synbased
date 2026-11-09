@@ -1,5 +1,5 @@
-import { AiKeyError, openAi, pastQuoteLines, type QuoteProposal } from '@/lib/ai';
-import { emptyElement, priceTable } from '@/lib/blocks';
+import { AiKeyError, openAi, pastQuoteLines, quoteLayout, type QuoteProposal } from '@/lib/ai';
+import { proposalBlocks } from '@/lib/blocks';
 import { createCustomer, createQuote, dagenErbij, getTenant, takeDocumentNumber, updateCustomer, vandaagHier } from '@/lib/db';
 import { appUrl } from '@/lib/email';
 import { plainTextToRichText } from '@/lib/richtext';
@@ -86,10 +86,11 @@ async function createQuoteFromMessage(account: WhatsAppAccountRow, message: Inco
       : null;
   const transcript = pending ? `${pending}\n\n${message.text}` : message.text!;
 
-  const [{ data: user }, tenant, pastLines] = await Promise.all([
+  const [{ data: user }, tenant, pastLines, layout] = await Promise.all([
     supabaseAdmin.from('users').select('name').eq('id', account.user_id).maybeSingle(),
     getTenant(account.tenant_id),
     pastQuoteLines(account.tenant_id),
+    quoteLayout(account.tenant_id),
   ]);
 
   let proposal: QuoteProposal;
@@ -101,6 +102,7 @@ async function createQuoteFromMessage(account: WhatsAppAccountRow, message: Inco
       userName: user?.name || '',
       knownCustomer: null,
       pastLines,
+      example: layout?.example ?? null,
     });
   } catch (error: any) {
     console.error('WhatsApp omzetten naar offerte:', error);
@@ -123,7 +125,8 @@ async function createQuoteFromMessage(account: WhatsAppAccountRow, message: Inco
   }
 
   const { customer, isNew } = await findOrCreateCustomer(account.tenant_id, proposal.customer);
-  const blocks = toBlocks(proposal);
+  // In de opzet van de laatste offerte, zoals bij "Omzetten naar offerte" in de Inbox
+  const blocks = proposalBlocks(proposal.quote, layout?.blocks);
   const today = vandaagHier();
 
   const quote = await createQuote(
@@ -251,34 +254,6 @@ async function findOrCreateCustomer(tenantId: string, proposed: ProposedCustomer
 // De offerte en het antwoord
 // ------------------------------------------------------------
 
-/** Dezelfde opbouw als "Omzetten naar offerte" in de Inbox: gegevens, inleiding, prijstabel, handtekening. */
-function toBlocks(proposal: QuoteProposal): DocumentBlock[] {
-  const title = proposal.quote.title.trim() || 'Offerte';
-  const lines = proposal.quote.items.filter(item => item.description.trim());
-
-  return [
-    {
-      title,
-      elements: [
-        emptyElement('gegevens'),
-        ...(proposal.quote.intro.trim() ? [{ ...emptyElement('tekst'), body: plainTextToRichText(proposal.quote.intro) }] : []),
-        priceTable(
-          (lines.length ? lines : [{ description: title, quantity: 1, unit: '', price: null, price_basis: '' }]).map(
-            item => ({
-              description: item.description.trim(),
-              is_heading: false,
-              quantity: Number(item.quantity) || 1,
-              unit: item.unit.trim() || null,
-              price: Number(item.price) || 0,
-            })
-          )
-        ),
-        emptyElement('handtekening'),
-      ],
-    },
-  ];
-}
-
 const amount = (value: number) => (Number.isInteger(value) ? String(value) : value.toLocaleString('nl-NL'));
 
 function summary(
@@ -288,7 +263,8 @@ function summary(
   proposal: QuoteProposal,
   blocks: DocumentBlock[]
 ): string {
-  const items = blocks[0].elements.find(element => element.kind === 'prijstabel')?.items || [];
+  const main = blocks.find(block => block.elements.some(element => element.kind === 'prijstabel')) || blocks[0];
+  const items = main.elements.filter(element => element.kind === 'prijstabel').flatMap(element => element.items).filter(item => !item.is_heading);
   const withoutPrice = items.filter(item => !item.price).length;
 
   const lines = items.map(item => {
@@ -301,7 +277,7 @@ function summary(
     `Offerte *${quote.quote_number}* staat als concept klaar.`,
     '',
     `Klant: ${getCustomerDisplayName(customer)} (${isNew ? 'nieuwe klant aangemaakt' : 'bestaande klant'})`,
-    `*${blocks[0].title}*`,
+    `*${main.title}*`,
     ...lines,
     '',
     `Totaal: ${formatCurrency(calculateDocumentTotal(blocks))} incl. btw${

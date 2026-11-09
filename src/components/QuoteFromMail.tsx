@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Trash2 } from 'lucide-react';
@@ -7,7 +7,7 @@ import Toggle from '@/components/Toggle';
 import ToolButton from '@/components/ToolButton';
 import { Skeleton } from '@/components/Skeleton';
 import { useToast } from '@/components/Toast';
-import { emptyElement, priceTable } from '@/lib/blocks';
+import { proposalBlocks } from '@/lib/blocks';
 import { plainTextToRichText } from '@/lib/richtext';
 import { overDagen, vandaag } from '@/lib/utils';
 import type { QuoteProposal } from '@/lib/ai/types';
@@ -40,7 +40,7 @@ const CUSTOMER_FIELDS: { key: keyof QuoteProposal['customer']; label: string; pl
   ],
 ];
 
-const emptyItem = (): Item => ({ description: '', quantity: 1, unit: '', price: null, price_basis: '' });
+const emptyItem = (): Item => ({ description: '', quantity: 1, unit: '', price: null, price_basis: '', section: '', vat_rate: 21 });
 
 /**
  * Een mail omzetten naar een offerte, met hulp van AI.
@@ -67,6 +67,8 @@ export default function QuoteFromMail({ threadId, onClose, onReplyDraft }: Quote
   const [reply, setReply] = useState('');
   const [prepareReply, setPrepareReply] = useState(true);
   const [created, setCreated] = useState<{ id: number; number: string } | null>(null);
+  // De opzet van de laatste offerte van het bedrijf; de nieuwe krijgt dezelfde opbouw
+  const [layout, setLayout] = useState<DocumentBlock[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +98,7 @@ export default function QuoteFromMail({ threadId, onClose, onReplyDraft }: Quote
         setMissing(proposal.missing);
         setReply(proposal.reply_draft);
         setPrepareReply(!!proposal.reply_draft.trim());
+        setLayout(data.layout || null);
         setPhase('review');
       } catch {
         if (cancelled) return;
@@ -135,26 +138,8 @@ export default function QuoteFromMail({ threadId, onClose, onReplyDraft }: Quote
         customerId = data.id;
       }
 
-      const lines = items.filter(item => item.description.trim());
-      const blocks: DocumentBlock[] = [
-        {
-          title: title.trim() || 'Offerte',
-          elements: [
-            emptyElement('gegevens'),
-            ...(intro.trim() ? [{ ...emptyElement('tekst'), body: plainTextToRichText(intro) }] : []),
-            priceTable(
-              (lines.length ? lines : [{ ...emptyItem(), description: title.trim() || 'Werkzaamheden' }]).map(item => ({
-                description: item.description.trim(),
-                is_heading: false,
-                quantity: Number(item.quantity) || 1,
-                unit: item.unit.trim() || null,
-                price: Number(item.price) || 0,
-              }))
-            ),
-            emptyElement('handtekening'),
-          ],
-        },
-      ];
+      // Met tussenkoppen per onderdeel, in de opzet van de vorige offerte
+      const blocks = proposalBlocks({ title, intro, items }, layout);
 
       const response = await fetch('/api/quotes', {
         method: 'POST',
@@ -275,7 +260,14 @@ export default function QuoteFromMail({ threadId, onClose, onReplyDraft }: Quote
                 <span />
               </div>
               {items.map((item, index) => (
-                <div key={index} className="proposal-item">
+                <Fragment key={index}>
+                {/* De tussenkop zoals hij op de offerte komt, zodra het onderdeel wisselt */}
+                {item.section?.trim() && item.section !== items[index - 1]?.section && (
+                  <div className="proposal-item heading">
+                    <strong>{item.section}</strong>
+                  </div>
+                )}
+                <div className="proposal-item">
                   <input
                     type="text"
                     value={item.description}
@@ -318,7 +310,9 @@ export default function QuoteFromMail({ threadId, onClose, onReplyDraft }: Quote
                     <Trash2 size={15} />
                   </ToolButton>
                   {item.price_basis && <span className="field-note">Prijs uit {item.price_basis}</span>}
+                  {item.vat_rate === 9 && <span className="field-note">9% btw</span>}
                 </div>
+                </Fragment>
               ))}
               <button type="button" className="button add-item" onClick={() => setItems([...items, emptyItem()])}>
                 + Regel

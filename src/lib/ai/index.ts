@@ -4,7 +4,10 @@ import type { MailThread } from '@/lib/mail/types';
 import { anthropic } from './anthropic';
 import { openai } from './openai';
 import { gemini } from './gemini';
-import { AI_PROVIDERS, AiKeyError, type AiProvider, type AiProviderName, type PastQuoteLine } from './types';
+import { AI_PROVIDERS, AiKeyError, type AiProvider, type AiProviderName, type PastQuoteLine, type QuoteExample } from './types';
+import { getQuote } from '@/lib/db';
+import { copyBlocks } from '@/lib/blocks';
+import type { DocumentBlock } from '@/lib/supabase';
 
 export * from './types';
 
@@ -128,4 +131,53 @@ export function threadToTranscript(thread: MailThread): string {
       ].join('\n')
     ),
   ].join('\n');
+}
+
+/**
+ * Hoe dit bedrijf zijn offertes opstelt, om een offerte uit een mail of
+ * WhatsApp-bericht net zo op te bouwen: de blokken van de laatste offerte met
+ * ingevulde regels (pagina's, teksten, handtekening), de inleiding daarvan en
+ * de tussenkoppen die het vaak gebruikt. Null als er nog geen offerte is.
+ */
+export async function quoteLayout(tenantId: string): Promise<{ blocks: DocumentBlock[]; example: QuoteExample } | null> {
+  const [{ data: recent, error }, { data: headings, error: headingsError }] = await Promise.all([
+    supabaseAdmin.from('quotes').select('id, status').eq('tenant_id', tenantId).order('created_at', { ascending: false }).limit(20),
+    supabaseAdmin
+      .from('quote_items')
+      .select('description')
+      .eq('tenant_id', tenantId)
+      .eq('is_heading', true)
+      .order('created_at', { ascending: false })
+      .limit(200),
+  ]);
+  if (error) throw error;
+  if (headingsError) throw headingsError;
+
+  const sections = [...new Set((headings || []).map((row: any) => String(row.description || '').trim()).filter(Boolean))].slice(0, 20);
+
+  // Een offerte die echt de deur uit ging zegt meer over de stijl dan een concept
+  const candidates = [...(recent || [])].sort((a: any, b: any) => Number(a.status === 'draft') - Number(b.status === 'draft'));
+
+  for (const { id } of candidates) {
+    const blocks = copyBlocks((await getQuote(id, tenantId)).blocks);
+    const main = blocks.find(block =>
+      block.elements.some(element => element.kind === 'prijstabel' && element.items.some(item => !item.is_heading && item.description.trim()))
+    );
+    if (!main) continue;
+
+    // De inleiding: de tekst boven de eerste prijstabel, zonder opmaak
+    const firstTable = main.elements.findIndex(element => element.kind === 'prijstabel');
+    const introElement = main.elements.slice(0, firstTable).find(element => element.kind === 'tekst');
+    const intro = String(introElement?.body || '')
+      .replace(/<\/(p|li|h\d)>/g, '\n')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\n{2,}/g, '\n')
+      .trim()
+      .slice(0, 600);
+
+    return { blocks, example: { intro, sections } };
+  }
+
+  return sections.length ? { blocks: [], example: { intro: '', sections } } : null;
 }

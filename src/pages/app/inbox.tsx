@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Archive,
+  ArrowLeft,
   Check,
   ChevronDown,
   ChevronUp,
@@ -14,6 +15,7 @@ import {
   Mail,
   MailCheck,
   MailOpen,
+  Menu,
   OctagonAlert,
   Plus,
   RefreshCw,
@@ -116,6 +118,8 @@ export default function InboxPage() {
   const [needsReconnect, setNeedsReconnect] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Op een telefoon staan de mappen achter een knop, zoals in Gmail
+  const [foldersOpen, setFoldersOpen] = useState(false);
   // Aangevinkte gesprekken, om in één keer te archiveren of te verwijderen
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [thread, setThread] = useState<MailThread | null>(null);
@@ -387,6 +391,7 @@ export default function InboxPage() {
   };
 
   const chooseFolder = (id: string) => {
+    setFoldersOpen(false);
     setFolder(id);
     setCategory('');
     setCheckedIds([]);
@@ -551,7 +556,9 @@ export default function InboxPage() {
 
   return (
     <Layout title="Inbox">
-      <div className="inbox">
+      {/* Op een telefoon is er één kolom tegelijk: de lijst, of het bericht dat open staat */}
+      <div className={`inbox${selectedId ? ' reading' : ''}${foldersOpen ? ' folders-open' : ''}`}>
+        <div className="modal-overlay folders-overlay" onClick={() => setFoldersOpen(false)} />
         <nav className="inbox-folders">
           {folders.length === 0 ? (
             Array.from({ length: 6 }, (_, i) => <Skeleton key={i} height="1.75rem" style={{ marginBottom: 'var(--space5)' }} />)
@@ -593,6 +600,9 @@ export default function InboxPage() {
         <div className="inbox-list">
           <div className="list-header">
             <div className="title-row">
+              <button type="button" className="button icon folders-toggle" aria-label="Mappen" onClick={() => setFoldersOpen(true)}>
+                <Menu size={15} />
+              </button>
               {items.length > 0 && (
                 <button
                   type="button"
@@ -748,6 +758,17 @@ export default function InboxPage() {
             <>
               <div className="thread">
                 <div className="thread-header">
+                  <span className="message-actions back">
+                    <ToolButton
+                      title="Terug"
+                      onClick={() => {
+                        setSelectedId(null);
+                        setThread(null);
+                      }}
+                    >
+                      <ArrowLeft size={15} />
+                    </ToolButton>
+                  </span>
                   <h2>{thread.subject}</h2>
                   <span className="message-actions">
                     {aiAccount && (

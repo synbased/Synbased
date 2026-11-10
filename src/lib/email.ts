@@ -44,6 +44,30 @@ interface QuoteEmailInput {
   intro?: string | null;
 }
 
+/**
+ * De eigen tekst zoals hij in de editor staat: alinea's zonder ruimte ertussen
+ * (een witregel is een lege alinea) en dezelfde regelhoogte. Zonder dit zet een
+ * mailprogramma zijn eigen marge om elke alinea en wordt elke witregel dubbel
+ * zo groot. De stijlen staan in de tags zelf; een stylesheet halen
+ * mailprogramma's eraf.
+ */
+const TEXT_STYLES: Record<string, string> = {
+  p: 'margin:0;',
+  ul: 'margin:0 0 14px 0;padding-left:20px;',
+  ol: 'margin:0 0 14px 0;padding-left:20px;',
+  li: 'margin:0 0 3px 0;',
+  h2: 'margin:20px 0 10px 0;font-size:20px;line-height:1.3;',
+  h3: 'margin:15px 0 5px 0;font-size:16px;line-height:1.3;',
+  blockquote: 'margin:0 0 14px 0;padding:0 0 0 15px;border-left:3px solid #efefef;color:#7f7f7f;',
+};
+
+function emailText(html: string): string {
+  const styled = html.replace(/<(p|ul|ol|li|h2|h3|blockquote)(\s[^>]*)?>/gi, (tag, name: string, attributes = '') =>
+    /\sstyle=/i.test(attributes) ? tag : `<${name}${attributes} style="${TEXT_STYLES[name.toLowerCase()]}">`
+  );
+  return `<div style="line-height:1.85;">${styled}</div>`;
+}
+
 /** Een eigen tekst voor deze mail, opgeschoond; leeg is "geen eigen tekst" */
 function ownIntro(intro?: string | null): string | null {
   return intro && !isRichTextEmpty(intro) ? toDisplayHtml(intro) : null;
@@ -130,8 +154,7 @@ export function emailLayout({ top, content, button, note, footer }: EmailLayout)
 export function quoteEmailIntro(tenant: Tenant, customer: Partial<Customer>): string {
   return tenant.quote_email_intro_text
     ? toDisplayHtml(tenant.quote_email_intro_text)
-    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u onze offerte. U kunt hem hieronder bekijken en direct ondertekenen.</p>`;
+    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p><p><br></p><p>Hierbij ontvangt u onze offerte. U kunt hem hieronder bekijken en direct ondertekenen.</p>`;
 }
 
 /**
@@ -142,7 +165,7 @@ export function quoteEmailIntro(tenant: Tenant, customer: Partial<Customer>): st
 export function buildQuoteEmailHtml({ tenant, customer, quote, token, intro }: QuoteEmailInput): string {
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: ownIntro(intro) ?? quoteEmailIntro(tenant, customer),
+    content: emailText(ownIntro(intro) ?? quoteEmailIntro(tenant, customer)),
     button: { label: 'Offerte bekijken en ondertekenen', url: quoteLink(token) },
     note: validUntilNote(quote),
     footer: tenantFooter(tenant),
@@ -241,8 +264,7 @@ export function invoiceEmailIntro(tenant: Tenant, customer: Partial<Customer>, i
   );
   return tenant.invoice_email_intro_text
     ? toDisplayHtml(tenant.invoice_email_intro_text)
-    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u onze factuur van ${escapeHtml(amountText)}. U kunt hem hieronder bekijken en betalen.</p>`;
+    : `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p><p><br></p><p>Hierbij ontvangt u onze factuur van ${escapeHtml(amountText)}. U kunt hem hieronder bekijken en betalen.</p>`;
 }
 
 /**
@@ -265,7 +287,7 @@ export function buildInvoiceEmailHtml({
 }): string {
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: (ownIntro(intro) ?? invoiceEmailIntro(tenant, customer, invoice)) + invoicePaymentBlock(tenant, invoice),
+    content: emailText(ownIntro(intro) ?? invoiceEmailIntro(tenant, customer, invoice)) + invoicePaymentBlock(tenant, invoice),
     button: { label: 'Factuur bekijken en betalen', url: invoiceLink(invoice.public_token || '') },
     footer: tenantFooter(tenant),
   });
@@ -322,8 +344,7 @@ export function creditNoteEmailIntro(customer: Partial<Customer>, invoice: Pick<
   const amountText = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(
     Math.abs(Number(invoice.total) || 0)
   );
-  return `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p>Hierbij ontvangt u een creditfactuur van ${escapeHtml(amountText)}${
+  return `<p>Beste ${escapeHtml(getCustomerDisplayName(customer))},</p><p><br></p><p>Hierbij ontvangt u een creditfactuur van ${escapeHtml(amountText)}${
          originalNumber ? ` voor factuur ${escapeHtml(originalNumber)}` : ''
        }. U kunt hem hieronder bekijken.</p>`;
 }
@@ -348,7 +369,7 @@ export function buildCreditNoteEmailHtml({
 }): string {
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: ownIntro(intro) ?? creditNoteEmailIntro(customer, invoice, originalNumber),
+    content: emailText(ownIntro(intro) ?? creditNoteEmailIntro(customer, invoice, originalNumber)),
     button: { label: 'Creditfactuur bekijken', url: invoiceLink(invoice.public_token || '') },
     footer: tenantFooter(tenant),
   });

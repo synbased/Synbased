@@ -7,6 +7,7 @@ import { SkeletonTable } from '@/components/Skeleton';
 import Pagination from '@/components/Pagination';
 import SelectionBar from '@/components/SelectionBar';
 import ToolButton from '@/components/ToolButton';
+import SendMail from '@/components/SendMail';
 import { usePagination } from '@/hooks/usePagination';
 import Link from 'next/link';
 import { Ellipsis, Check, Trash2, Mail, Download, FileOutput } from 'lucide-react';
@@ -46,6 +47,8 @@ export default function Quotes() {
   // Lange lijsten in pagina's; de selectie en het verwijderen gaan over de hele lijst
   const pagination = usePagination(quotes);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // De offertes die nog verstuurd worden; van de huidige staat de mail open
+  const [sendQueue, setSendQueue] = useState<{ ids: string[]; index: number } | null>(null);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -140,35 +143,22 @@ export default function Quotes() {
   );
   const notApproved = quotes.filter(q => selectedIds.includes(q.id) && q.status !== 'approved').length;
 
-  /** Verstuurt de geselecteerde offertes één voor één naar hun klant. */
-  const handleBulkSend = async () => {
-    const confirmed = await confirm({
-      title: 'Offertes versturen',
-      message: `${selectedIds.length} offerte(s) per mail naar de klant sturen? Elke klant krijgt een knop naar zijn offerte om hem te bekijken en te ondertekenen.`,
-      confirmText: 'Versturen',
-      cancelText: 'Annuleren',
-    });
+  /**
+   * De geselecteerde offertes één voor één versturen: van elke offerte zie je
+   * eerst de mail, die je kunt aanpassen. Annuleren slaat die offerte over.
+   */
+  const handleBulkSend = () => setSendQueue({ ids: selectedIds.map(String), index: 0 });
 
-    if (!confirmed) return;
-
-    let sent = 0;
-    for (const id of selectedIds) {
-      try {
-        const response = await fetch(`/api/quotes/${id}/send`, { method: 'POST' });
-        if (response.ok) sent += 1;
-      } catch (error) {
-        console.error('Error sending quote:', error);
+  // Na het versturen of overslaan de volgende; na de laatste de lijst bijwerken
+  const nextInQueue = () => {
+    setSendQueue(current => {
+      if (!current || current.index + 1 >= current.ids.length) {
+        if (current && current.ids.length > 1) setSelectedIds([]);
+        fetchQuotes();
+        return null;
       }
-    }
-
-    if (sent === selectedIds.length) {
-      toast.success('Verstuurd', `${sent} offerte(s) verstuurd`);
-    } else {
-      toast.error('Niet alles verstuurd', `${sent} van de ${selectedIds.length} offertes verstuurd`);
-    }
-
-    setSelectedIds([]);
-    fetchQuotes();
+      return { ...current, index: current.index + 1 };
+    });
   };
 
   /**
@@ -254,36 +244,8 @@ export default function Quotes() {
     }
   };
 
-  const handleSend = async (quoteId: string) => {
-    const confirmed = await confirm({
-      title: 'Offerte versturen',
-      message:
-        'De klant krijgt een mail met een knop naar deze offerte, waar hij hem kan bekijken en ondertekenen.',
-      confirmText: 'Versturen',
-      cancelText: 'Annuleren',
-    });
-
-    if (!confirmed) return;
-
-    try {
-      const response = await fetch(`/api/quotes/${quoteId}/send`, { method: 'POST' });
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error('Versturen mislukt', data.error || 'Er is iets misgegaan');
-        return;
-      }
-
-      toast.success(
-        'Verstuurd',
-        `De offerte is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
-      );
-      fetchQuotes();
-    } catch (error) {
-      console.error('Error sending quote:', error);
-      toast.error('Versturen mislukt', 'Er is iets misgegaan. Probeer het opnieuw.');
-    }
-  };
+  // Eerst de mail bekijken en eventueel aanpassen, dan pas versturen
+  const handleSend = (quoteId: string) => setSendQueue({ ids: [String(quoteId)], index: 0 });
 
   const handleConvertToInvoice = async (quoteId: string) => {
     const confirmed = await confirm({
@@ -513,6 +475,23 @@ export default function Quotes() {
           <Trash2 size={15} />
         </ToolButton>
       </SelectionBar>
+
+      {sendQueue && (
+        <SendMail
+          isOpen
+          title={`Offerte versturen${sendQueue.ids.length > 1 ? ` (${sendQueue.index + 1} van ${sendQueue.ids.length})` : ''}`}
+          endpoint={`/api/quotes/${sendQueue.ids[sendQueue.index]}/send`}
+          note="Onder je tekst komt de knop waarmee de klant de offerte bekijkt en ondertekent."
+          onClose={nextInQueue}
+          onSent={(data) => {
+            toast.success(
+              'Verstuurd',
+              `De offerte is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
+            );
+            nextInQueue();
+          }}
+        />
+      )}
     </Layout>
   );
 }

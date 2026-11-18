@@ -7,12 +7,10 @@ import Modal from '@/components/Modal';
 import SignaturePad from '@/components/SignaturePad';
 import { SkeletonCard } from '@/components/Skeleton';
 import type { Customer, DocumentBlock, Tenant } from '@/lib/supabase';
-import { formatDate, projectMeta } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { pageTitle } from '@/lib/constants';
 
 interface PublicQuote {
-  /** Het project waar hij bij hoort; het adres komt op het document */
-  project?: { address: string | null } | null;
   quote_number: string;
   quote_date: string;
   valid_until: string;
@@ -178,7 +176,6 @@ export default function PublicQuote() {
                   { label: 'Offertenummer', value: quote.quote_number },
                   { label: 'Offertedatum', value: formatDate(quote.quote_date) },
                   { label: 'Geldig tot', value: formatDate(quote.valid_until) },
-                  ...projectMeta(quote.project?.address),
                 ]}
                 customer={quote.customer}
                 blocks={quote.blocks}

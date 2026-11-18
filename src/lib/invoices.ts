@@ -1,4 +1,4 @@
-import { formatDate, projectMeta } from './utils';
+import { formatDate } from './utils';
 
 /**
  * De regels rond een factuur die de deur uit is.
@@ -44,9 +44,7 @@ export const FINAL_INVOICE_ERROR =
  */
 export function invoiceMeta(
   invoice: { invoice_number?: string | null; invoice_date?: string | null; due_date?: string | null },
-  creditFor?: { invoice_number?: string | null } | null,
-  /** Het adres van de klus, als de factuur bij een project hoort */
-  projectAddress?: string | null
+  creditFor?: { invoice_number?: string | null } | null
 ): { label: string; value: string }[] {
   return [
     // Een concept krijgt zijn nummer pas bij het vastleggen
@@ -54,6 +52,5 @@ export function invoiceMeta(
     ...(creditFor ? [{ label: 'Bij factuur', value: creditFor.invoice_number || '' }] : []),
     { label: 'Factuurdatum', value: formatDate(invoice.invoice_date) },
     ...(creditFor ? [] : [{ label: 'Vervaldatum', value: formatDate(invoice.due_date) }]),
-    ...projectMeta(projectAddress),
   ];
 }

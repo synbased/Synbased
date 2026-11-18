@@ -9,8 +9,6 @@ import { invoiceReference } from '@/lib/payment';
 import { usePrintWhenReady } from '@/hooks/usePrintWhenReady';
 
 interface PrintInvoice {
-  /** Het project waar hij bij hoort; het adres komt op het document */
-  project?: { address: string | null } | null;
   id: number;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -85,7 +83,7 @@ export default function PrintInvoice() {
 
             <DocumentPreview
               title={invoiceTitle(invoice)}
-              meta={invoiceMeta(invoice, invoice.credit_for, invoice.project?.address)}
+              meta={invoiceMeta(invoice, invoice.credit_for)}
               customer={invoice.customer}
               blocks={invoice.blocks}
               currency={invoice.currency}

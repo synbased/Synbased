@@ -169,13 +169,3 @@ export function errorStatus(error: any): number {
   if (code === 'PGRST116' || /niet gevonden|not found/i.test(error?.message || '')) return 404;
   return error?.constructor === Error && !code ? 400 : 500;
 }
-
-/**
- * Het adres van de klus op een offerte of factuur, als hij bij een project
- * hoort met een eigen adres. Zo ziet een opdrachtgever met meer klussen, zoals
- * een aannemer voor wie je werkt, meteen over welke het gaat. In een eigen
- * sjabloon is het {{projectadres}}.
- */
-export function projectMeta(address?: string | null): { label: string; value: string }[] {
-  return address?.trim() ? [{ label: 'Projectadres', value: address.trim() }] : [];
-}

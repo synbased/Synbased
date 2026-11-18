@@ -14,7 +14,7 @@ import DocumentEditor from '@/components/DocumentEditor';
 import type { SignatureState } from '@/components/DocumentPreview';
 import type { Customer, DocumentBlock } from '@/lib/supabase';
 import { copyBlocks, validateBlocks } from '@/lib/blocks';
-import { formatDate, getCustomerOptionLabel, vandaag, overDagen, projectMeta } from '@/lib/utils';
+import { formatDate, getCustomerOptionLabel, vandaag, overDagen } from '@/lib/utils';
 import { useConfirm } from '@/hooks/useConfirm';
 import { useMailAccount } from '@/hooks/useMailAccount';
 import { useHistory } from '@/hooks/useHistory';
@@ -355,7 +355,6 @@ export default function EditQuote() {
           { label: 'Offertenummer', value: formData.quote_number },
           { label: 'Offertedatum', value: formatDate(formData.quote_date) },
           { label: 'Geldig tot', value: formatDate(formData.valid_until) },
-          ...projectMeta(projectOptions.find(o => o.value === formData.project_id)?.address),
         ]}
         customer={selectedCustomer}
         blocks={formData.blocks}

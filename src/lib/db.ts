@@ -974,7 +974,7 @@ export async function getQuotes(tenantId: string, customerId?: number | string) 
 export async function getQuote(id: string | number, tenantId: string) {
   const { data, error } = await supabase
     .from('quotes')
-    .select('*, customer:customers(*), project:projects(name, address)')
+    .select('*, customer:customers(*)')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .maybeSingle();
@@ -1065,8 +1065,7 @@ export async function getQuoteByToken(token: string) {
     .select(
       'id, tenant_id, quote_number, quote_date, valid_until, total, status, currency, ' +
         'signed_at, signed_name, signature_image, viewed_at, view_count, ' +
-        'customer:customers(name, first_name, middle_name, last_name, company_name, street_address, postal_code, city), ' +
-        'project:projects(address)'
+        'customer:customers(name, first_name, middle_name, last_name, company_name, street_address, postal_code, city)'
     )
     .eq('public_token', token)
     .maybeSingle();
@@ -1093,8 +1092,7 @@ export async function getInvoiceByToken(token: string) {
     .from('invoices')
     .select(
       'id, tenant_id, invoice_number, invoice_date, due_date, total, status, currency, paid_at, ' +
-        'customer:customers(name, first_name, middle_name, last_name, company_name, street_address, postal_code, city), ' +
-        'project:projects(address)'
+        'customer:customers(name, first_name, middle_name, last_name, company_name, street_address, postal_code, city)'
     )
     .eq('public_token', token)
     .maybeSingle();
@@ -1206,7 +1204,7 @@ export async function getInvoices(tenantId: string) {
 export async function getInvoice(id: string | number, tenantId: string) {
   const { data, error } = await supabase
     .from('invoices')
-    .select('*, customer:customers(*), project:projects(name, address)')
+    .select('*, customer:customers(*)')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .maybeSingle();

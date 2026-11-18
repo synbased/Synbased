@@ -790,6 +790,15 @@ ALTER TABLE tenants ADD COLUMN IF NOT EXISTS invoice_payment_days INTEGER;
 ALTER TABLE quote_items ALTER COLUMN quantity TYPE NUMERIC(12,3);
 ALTER TABLE invoice_items ALTER COLUMN quantity TYPE NUMERIC(12,3);
 
+-- ------------------------------------------------------------
+-- 25. Eigen tekst voor de offerteherinnering
+--
+-- Onderwerp en tekst van de herinnering als een offerte na het ingestelde
+-- aantal dagen nog niet is ondertekend. Leeg is de standaardtekst.
+-- ------------------------------------------------------------
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS quote_reminder_subject TEXT;
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS quote_reminder_text TEXT;
+
 -- De rechten opnieuw, zodat de nieuwe tabellen ze ook hebben
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
@@ -804,7 +813,7 @@ NOTIFY pgrst, 'reload schema';
 -- Controle achteraf
 --
 -- Eén opdracht, want de SQL-editor toont alleen de uitkomst van de laatste.
--- Er horen vijfentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
+-- Er horen zesentwintig regels uit te komen die allemaal met "ja" beginnen. Staat er
 -- ergens NEE, dan is dat onderdeel niet gelukt.
 -- ------------------------------------------------------------
 SELECT 'Elementtypes offerte' AS controle,
@@ -981,4 +990,11 @@ UNION ALL SELECT 'Aantallen op drie decimalen',
          SELECT count(*) FROM information_schema.columns
          WHERE table_schema = 'public' AND table_name IN ('quote_items', 'invoice_items')
            AND column_name = 'quantity' AND numeric_scale = 3
-       ) = 2 THEN 'ja' ELSE 'NEE - onderdeel 24 niet gelukt' END;
+       ) = 2 THEN 'ja' ELSE 'NEE - onderdeel 24 niet gelukt' END
+
+UNION ALL SELECT 'Tekst offerteherinnering',
+       CASE WHEN (
+         SELECT count(*) FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'tenants'
+           AND column_name IN ('quote_reminder_subject', 'quote_reminder_text')
+       ) = 2 THEN 'ja' ELSE 'NEE - onderdeel 25 niet gelukt' END;

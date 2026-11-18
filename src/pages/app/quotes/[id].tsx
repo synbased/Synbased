@@ -9,6 +9,7 @@ import { useToast } from '@/components/Toast';
 import Select from '@/components/Select';
 import DatePicker from '@/components/DatePicker';
 import SendMail from '@/components/SendMail';
+import { isQuoteReminderDue } from '@/lib/constants';
 import DocumentEditor from '@/components/DocumentEditor';
 import type { SignatureState } from '@/components/DocumentPreview';
 import type { Customer, DocumentBlock } from '@/lib/supabase';
@@ -62,6 +63,10 @@ export default function EditQuote() {
   const [isConverting, setIsConverting] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
+  const [remindOpen, setRemindOpen] = useState(false);
+  // Wanneer de offerte verstuurd is, en na hoeveel dagen een herinnering mag (Instellingen)
+  const [sentAt, setSentAt] = useState<string | null>(null);
+  const [reminderDays, setReminderDays] = useState<number | null>(null);
   const [signature, setSignature] = useState<SignatureState | null>(null);
   // Wanneer de klant de verstuurde offerte voor het eerst opende
   const [viewedAt, setViewedAt] = useState<string | null>(null);
@@ -84,6 +89,7 @@ export default function EditQuote() {
 
       setConvertedInvoiceId(quote.converted_to_invoice_id || null);
       setViewedAt(quote.viewed_at || null);
+      setSentAt(quote.sent_at || null);
       setSignature({
         image: quote.signature_image || null,
         name: quote.signed_name || null,
@@ -214,6 +220,16 @@ export default function EditQuote() {
     }
   };
 
+  useEffect(() => {
+    fetch('/api/tenant')
+      .then(response => (response.ok ? response.json() : null))
+      .then(tenant => setReminderDays(tenant?.quote_reminder_days || null))
+      .catch(() => {});
+  }, []);
+
+  // Staat hij langer open dan het ingestelde aantal dagen, dan kun je zelf een herinnering sturen
+  const reminderDue = isQuoteReminderDue({ status: formData.status, sent_at: sentAt, signed_at: signature?.signedAt }, reminderDays);
+
   const handleSent = (data: any) => {
     setSendOpen(false);
     toast.success(
@@ -298,6 +314,11 @@ export default function EditQuote() {
             viewedAt && <span className="autosave-status">Geopend door de klant op {formatDate(viewedAt)}</span>
           )}
           {/* Versturen gaat via de eigen Gmail of Outlook; zonder koppeling is er geen knop */}
+          {mailAccount && reminderDue && (
+            <button type="button" className="button cancel" onClick={() => setRemindOpen(true)}>
+              Herinnering sturen
+            </button>
+          )}
           {mailAccount && (
             <button type="button" className="button cancel" onClick={handleSend} disabled={isSending}>
               {isSending ? 'Versturen...' : 'Versturen'}
@@ -438,6 +459,18 @@ export default function EditQuote() {
         note="Onder je tekst komt de knop waarmee de klant de offerte bekijkt en ondertekent."
         onClose={() => setSendOpen(false)}
         onSent={handleSent}
+      />
+
+      <SendMail
+        isOpen={remindOpen}
+        title="Herinnering sturen"
+        endpoint={`/api/quotes/${id}/remind`}
+        note="Onder je tekst komt de knop waarmee de klant de offerte bekijkt en ondertekent."
+        onClose={() => setRemindOpen(false)}
+        onSent={(data) => {
+          setRemindOpen(false);
+          toast.success('Verstuurd', `De herinnering is naar ${data.sentTo} gestuurd`);
+        }}
       />
     </Layout>
   );

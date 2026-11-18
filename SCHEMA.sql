@@ -54,6 +54,8 @@ CREATE TABLE tenants (
   invoice_email_intro_text TEXT,-- de tekst onder het logo in de factuurmail
   -- Na zoveel dagen zonder handtekening gaat er één herinnering; leeg = nooit
   quote_reminder_days INTEGER,
+  quote_reminder_subject TEXT,  -- onderwerp van die herinnering; leeg = de standaard
+  quote_reminder_text TEXT,     -- de tekst van die herinnering; leeg = de standaard
   -- Zoveel dagen na de vervaldatum een betalingsherinnering, en daarna nog één; null is nooit
   invoice_reminder_days INTEGER,
   -- Na zoveel dagen vervalt een nieuwe factuur; leeg is 30 dagen

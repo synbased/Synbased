@@ -26,6 +26,8 @@ const EDITABLE_FIELDS = [
   'quote_number_next',
   'invoice_number_next',
   'quote_reminder_days',
+  'quote_reminder_subject',
+  'quote_reminder_text',
   'invoice_reminder_days',
   'invoice_payment_days',
   'paper_orientation',

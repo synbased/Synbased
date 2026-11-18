@@ -66,6 +66,9 @@ export interface Tenant {
   invoice_number_next: string | null;
   /** Na zoveel dagen zonder handtekening gaat er één herinnering; null is nooit */
   quote_reminder_days: number | null;
+  /** Onderwerp en tekst van die herinnering; leeg is de standaard */
+  quote_reminder_subject: string | null;
+  quote_reminder_text: string | null;
   /** Zoveel dagen na de vervaldatum een betalingsherinnering, en daarna nog één; null is nooit */
   invoice_reminder_days: number | null;
   /** Na zoveel dagen vervalt een nieuwe factuur; null is 30 dagen */

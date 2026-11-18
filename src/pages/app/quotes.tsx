@@ -16,7 +16,7 @@ import { useConfirm } from '@/hooks/useConfirm';
 import { useMailAccount } from '@/hooks/useMailAccount';
 import { useToast } from '@/components/Toast';
 import { copyBlocks } from '@/lib/blocks';
-import { QUOTE_STATUS } from '@/lib/constants';
+import { QUOTE_STATUS, isQuoteReminderDue } from '@/lib/constants';
 import type { Customer } from '@/lib/supabase';
 
 interface Quote {
@@ -32,6 +32,8 @@ interface Quote {
   viewed_at: string | null;
   view_count: number;
   reminder_sent_at: string | null;
+  sent_at: string | null;
+  signed_at: string | null;
   created_at: string;
 }
 
@@ -48,7 +50,17 @@ export default function Quotes() {
   const pagination = usePagination(quotes);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   // De offertes die nog verstuurd worden; van de huidige staat de mail open
-  const [sendQueue, setSendQueue] = useState<{ ids: string[]; index: number } | null>(null);
+  // Versturen, of een herinnering bij een offerte die te lang openstaat
+  const [sendQueue, setSendQueue] = useState<{ ids: string[]; index: number; reminder?: boolean } | null>(null);
+  // Na hoeveel dagen een herinnering mag, uit Instellingen
+  const [reminderDays, setReminderDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/tenant')
+      .then(response => (response.ok ? response.json() : null))
+      .then(tenant => setReminderDays(tenant?.quote_reminder_days || null))
+      .catch(() => {});
+  }, []);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -278,6 +290,14 @@ export default function Quotes() {
   // Een verstuurde offerte die de klant al opende, heet "Geopend"; wanneer en
   // hoe vaak staat erbij als je er met de muis op staat
   const getStatusBadge = (quote: Quote) => {
+    // Staat hij langer open dan het ingestelde aantal dagen: dat zie je meteen
+    if (isQuoteReminderDue(quote, reminderDays) && !quote.reminder_sent_at) {
+      return (
+        <span className="status-badge status-sent" title={`Verstuurd op ${formatDate(quote.sent_at)}, nog niet ondertekend`}>
+          Herinnering nodig
+        </span>
+      );
+    }
     if (quote.status === 'sent' && quote.viewed_at) {
       const details = [
         `Eerst geopend op ${formatDate(quote.viewed_at)}`,
@@ -406,6 +426,19 @@ export default function Quotes() {
                           Versturen
                         </Link>
                       )}
+                      {canSend && isQuoteReminderDue(quote, reminderDays) && (
+                        <Link
+                          href=""
+                          className="edit"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setOpenDropdownId(null);
+                            setSendQueue({ ids: [String(quote.id)], index: 0, reminder: true });
+                          }}
+                        >
+                          Herinnering sturen
+                        </Link>
+                      )}
                       <Link
                         href={`/api/quotes/${quote.id}/pdf`}
                         className="edit"
@@ -479,14 +512,14 @@ export default function Quotes() {
       {sendQueue && (
         <SendMail
           isOpen
-          title={`Offerte versturen${sendQueue.ids.length > 1 ? ` (${sendQueue.index + 1} van ${sendQueue.ids.length})` : ''}`}
-          endpoint={`/api/quotes/${sendQueue.ids[sendQueue.index]}/send`}
+          title={`${sendQueue.reminder ? 'Herinnering sturen' : 'Offerte versturen'}${sendQueue.ids.length > 1 ? ` (${sendQueue.index + 1} van ${sendQueue.ids.length})` : ''}`}
+          endpoint={`/api/quotes/${sendQueue.ids[sendQueue.index]}/${sendQueue.reminder ? 'remind' : 'send'}`}
           note="Onder je tekst komt de knop waarmee de klant de offerte bekijkt en ondertekent."
           onClose={nextInQueue}
           onSent={(data) => {
             toast.success(
               'Verstuurd',
-              `De offerte is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
+              `De ${sendQueue.reminder ? 'herinnering' : 'offerte'} is naar ${data.sentTo} gestuurd${data.via === 'google' ? ' vanuit je Gmail' : data.via === 'microsoft' ? ' vanuit je Outlook' : ''}`
             );
             nextInQueue();
           }}

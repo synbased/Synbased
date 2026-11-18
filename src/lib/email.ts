@@ -2,6 +2,7 @@ import type { Customer, Invoice, Quote, Tenant } from './supabase';
 import { canRequestPayment, formatIban, invoiceReference } from './payment';
 import { getCustomerDisplayName } from './utils';
 import { isRichTextEmpty, toDisplayHtml } from './richtext';
+import { DEFAULT_QUOTE_REMINDER_SUBJECT, DEFAULT_QUOTE_REMINDER_TEXT } from './constants';
 
 /**
  * Het adres waarop de app bereikbaar is. De knop in de mail moet een volledige
@@ -202,17 +203,37 @@ function validUntilNote(quote: Pick<Quote, 'valid_until'>): string | undefined {
     : undefined;
 }
 
+/** De tags in een herinnering: het offertenummer en de naam van de klant */
+function quoteReminderTags(tenant: Tenant, quote: Pick<Quote, 'quote_number'>, customer: Partial<Customer>) {
+  return {
+    offertenummer: quote.quote_number || '',
+    klant: getCustomerDisplayName(customer),
+    bedrijf: tenant.company_name || tenant.name || '',
+  };
+}
+
+/** Het onderwerp van de offerteherinnering: dat uit Instellingen, of de standaard */
+export function buildQuoteReminderEmailSubject(tenant: Tenant, quote: Pick<Quote, 'quote_number'>, customer: Partial<Customer>): string {
+  return fillSubjectTags(tenant.quote_reminder_subject?.trim() || DEFAULT_QUOTE_REMINDER_SUBJECT, quoteReminderTags(tenant, quote, customer));
+}
+
+/** De tekst van de offerteherinnering, met de tags ingevuld */
+export function quoteReminderIntro(tenant: Tenant, quote: Pick<Quote, 'quote_number'>, customer: Partial<Customer>): string {
+  const text = tenant.quote_reminder_text && !isRichTextEmpty(tenant.quote_reminder_text) ? tenant.quote_reminder_text : DEFAULT_QUOTE_REMINDER_TEXT;
+  const tags = Object.fromEntries(Object.entries(quoteReminderTags(tenant, quote, customer)).map(([key, value]) => [key, escapeHtml(value)]));
+  return fillSubjectTags(toDisplayHtml(text), tags);
+}
+
 /**
  * De herinnering als een verstuurde offerte na een aantal dagen nog niet is
- * ondertekend. Zelfde opmaak, logo en knop als de offertemail zelf, met een
- * korte, vriendelijke tekst.
+ * ondertekend. Zelfde opmaak, logo en knop als de offertemail zelf, met de
+ * tekst uit Instellingen of de standaard, of zoals hij voor deze ene offerte
+ * is aangepast.
  */
-export function buildQuoteReminderEmailHtml({ tenant, customer, quote, token }: QuoteEmailInput): string {
+export function buildQuoteReminderEmailHtml({ tenant, customer, quote, token, intro }: QuoteEmailInput): string {
   return emailLayout({
     top: tenantLogoRow(tenant),
-    content: `<p style="margin:0 0 16px 0;">Beste ${escapeHtml(getCustomerDisplayName(customer))},</p>
-       <p style="margin:0 0 16px 0;">Een paar dagen geleden stuurden wij u offerte ${escapeHtml(quote.quote_number || '')}. Heeft u al tijd gehad om ernaar te kijken?</p>
-       <p style="margin:0;">Met de knop hieronder bekijkt en ondertekent u hem direct. Heeft u nog vragen, beantwoord dan gerust deze mail.</p>`,
+    content: emailText(ownIntro(intro) ?? quoteReminderIntro(tenant, quote, customer)),
     button: { label: 'Offerte bekijken en ondertekenen', url: quoteLink(token) },
     note: validUntilNote(quote),
     footer: tenantFooter(tenant),

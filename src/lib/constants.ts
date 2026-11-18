@@ -22,6 +22,24 @@ export const TOO_MANY_ATTEMPTS = 'TOO_MANY_ATTEMPTS';
 /** Zo kort mag een nieuw wachtwoord minimaal zijn */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * De standaard herinnering bij een offerte die nog niet is ondertekend. Bij
+ * Instellingen > Offertes aan te passen; de tags worden bij het versturen
+ * ingevuld.
+ */
+export const DEFAULT_QUOTE_REMINDER_SUBJECT = 'Herinnering: offerte {{offertenummer}}';
+export const DEFAULT_QUOTE_REMINDER_TEXT =
+  '<p>Beste {{klant}},</p><p><br></p><p>Een paar dagen geleden stuurden wij u offerte {{offertenummer}}. Heeft u al tijd gehad om ernaar te kijken?</p><p><br></p><p>Met de knop hieronder bekijkt en ondertekent u hem direct. Heeft u nog vragen, beantwoord dan gerust deze mail.</p>';
+
+/** Of een verstuurde, nog niet getekende offerte langer openstaat dan het ingestelde aantal dagen */
+export function isQuoteReminderDue(
+  quote: { status: string; sent_at?: string | null; signed_at?: string | null },
+  days: number | null | undefined
+): boolean {
+  if (!days || quote.status !== 'sent' || quote.signed_at || !quote.sent_at) return false;
+  return Date.now() - new Date(quote.sent_at).getTime() >= days * 24 * 60 * 60 * 1000;
+}
+
 /** De statussen van een offerte, met hun naam en hun kleur in de lijst. */
 export const QUOTE_STATUS: Record<string, { label: string; className: string }> = {
   draft: { label: 'Concept', className: 'status-draft' },

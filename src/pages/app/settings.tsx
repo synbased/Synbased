@@ -14,7 +14,7 @@ import Toggle from '@/components/Toggle';
 import Select from '@/components/Select';
 import PasswordInput from '@/components/PasswordInput';
 import type { Tenant } from '@/lib/supabase';
-import { MIN_PASSWORD_LENGTH } from '@/lib/constants';
+import { MIN_PASSWORD_LENGTH, DEFAULT_QUOTE_REMINDER_SUBJECT, DEFAULT_QUOTE_REMINDER_TEXT } from '@/lib/constants';
 import { DEFAULT_INVOICE_TEMPLATE, DEFAULT_QUOTE_TEMPLATE } from '@/lib/document-templates';
 
 const PAPER_OPTIONS = [
@@ -65,6 +65,8 @@ export default function Settings() {
         invoice_email_subject: '',
         invoice_email_intro_text: '',
         quote_reminder_days: '',
+        quote_reminder_subject: DEFAULT_QUOTE_REMINDER_SUBJECT,
+        quote_reminder_text: DEFAULT_QUOTE_REMINDER_TEXT,
         invoice_reminder_days: '',
         invoice_payment_days: '',
     });
@@ -262,6 +264,9 @@ export default function Settings() {
                     invoice_email_subject: tenant.invoice_email_subject || '',
                     invoice_email_intro_text: tenant.invoice_email_intro_text || '',
                     quote_reminder_days: tenant.quote_reminder_days ? String(tenant.quote_reminder_days) : '',
+                    // Leeg is de standaard; die staat er dan in, zodat je ziet wat er gaat
+                    quote_reminder_subject: tenant.quote_reminder_subject || DEFAULT_QUOTE_REMINDER_SUBJECT,
+                    quote_reminder_text: tenant.quote_reminder_text || DEFAULT_QUOTE_REMINDER_TEXT,
                     invoice_reminder_days: tenant.invoice_reminder_days ? String(tenant.invoice_reminder_days) : '',
                     invoice_payment_days: tenant.invoice_payment_days ? String(tenant.invoice_payment_days) : '',
                 });
@@ -342,6 +347,11 @@ export default function Settings() {
                 quote_email_subject: emailSettings.quote_email_subject,
                 quote_email_intro_text: emailSettings.quote_email_intro_text,
                 quote_reminder_days: reminderEnabled ? emailSettings.quote_reminder_days : '',
+                // Ongewijzigd de standaard? Dan niets bewaren, zodat een betere standaard later vanzelf meekomt
+                quote_reminder_subject:
+                    emailSettings.quote_reminder_subject.trim() === DEFAULT_QUOTE_REMINDER_SUBJECT ? '' : emailSettings.quote_reminder_subject,
+                quote_reminder_text:
+                    emailSettings.quote_reminder_text === DEFAULT_QUOTE_REMINDER_TEXT ? '' : emailSettings.quote_reminder_text,
             },
             'Offerte-instellingen opgeslagen'
         );
@@ -1114,6 +1124,51 @@ export default function Settings() {
                                 </div>
                             </div>
 
+
+                            {reminderEnabled && (
+                                <>
+                                    <div className="row-section">
+                                        <div className="information">
+                                            <label className="title" htmlFor="quote_reminder_subject">Onderwerp herinnering</label>
+                                            <span className="description">
+                                                Gebruik <code>&#123;&#123;offertenummer&#125;&#125;</code>,{' '}
+                                                <code>&#123;&#123;klant&#125;&#125;</code> of{' '}
+                                                <code>&#123;&#123;bedrijf&#125;&#125;</code>.
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <input
+                                                id="quote_reminder_subject"
+                                                type="text"
+                                                value={emailSettings.quote_reminder_subject}
+                                                onChange={(e) =>
+                                                    setEmailSettings({ ...emailSettings, quote_reminder_subject: e.target.value })
+                                                }
+                                                placeholder="Vul een onderwerp in"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="row-section">
+                                        <div className="information">
+                                            <span className="title">Tekst herinnering</span>
+                                            <span className="description">
+                                                Komt onder je logo, boven de knop naar de offerte. Ook hier kun je de
+                                                tags gebruiken.
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <RichTextEditor
+                                                value={emailSettings.quote_reminder_text}
+                                                onChange={(quote_reminder_text) =>
+                                                    setEmailSettings({ ...emailSettings, quote_reminder_text })
+                                                }
+                                                placeholder="Vul een tekst in"
+                                            />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </>
                     )}
 

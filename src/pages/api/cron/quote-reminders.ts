@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getTenant } from '@/lib/db';
-import { buildQuoteEmailSubject, buildQuoteReminderEmailHtml } from '@/lib/email';
+import { buildQuoteReminderEmailHtml, buildQuoteReminderEmailSubject } from '@/lib/email';
 import { openMailbox } from '@/lib/mail';
 import type { Tenant } from '@/lib/supabase';
 
@@ -62,7 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     try {
       const mailbox = await openMailbox(quote.sent_by);
-      const subject = `Herinnering: ${buildQuoteEmailSubject(tenant, quote, quote.customer)}`;
+      const subject = buildQuoteReminderEmailSubject(tenant, quote, quote.customer);
       const html = buildQuoteReminderEmailHtml({ tenant, customer: quote.customer, quote, token: quote.public_token });
       await mailbox.provider.compose(mailbox.accessToken, [quote.customer.email], subject, html, mailbox.email);
 

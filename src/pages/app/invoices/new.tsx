@@ -11,7 +11,7 @@ import DatePicker from '@/components/DatePicker';
 import DocumentEditor from '@/components/DocumentEditor';
 import type { Customer, DocumentBlock } from '@/lib/supabase';
 import { startBlocks, validateBlocks } from '@/lib/blocks';
-import { formatDate, getCustomerOptionLabel, vandaag, overDagen } from '@/lib/utils';
+import { formatDate, getCustomerOptionLabel, vandaag, overDagen, projectMeta } from '@/lib/utils';
 
 const currencyOptions = [
   { value: 'EUR', label: 'EUR (€)' },
@@ -168,6 +168,7 @@ export default function NewInvoice() {
           { label: 'Factuurnummer', value: 'Volgt bij versturen' },
           { label: 'Factuurdatum', value: formatDate(formData.invoice_date) },
           { label: 'Vervaldatum', value: formatDate(formData.due_date) },
+          ...projectMeta(projectOptions.find(o => o.value === formData.project_id)?.address),
         ]}
         customer={selectedCustomer}
         blocks={formData.blocks}

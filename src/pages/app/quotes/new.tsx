@@ -11,7 +11,7 @@ import DatePicker from '@/components/DatePicker';
 import DocumentEditor from '@/components/DocumentEditor';
 import type { Customer, DocumentBlock } from '@/lib/supabase';
 import { startBlocks, validateBlocks } from '@/lib/blocks';
-import { formatDate, getCustomerOptionLabel, vandaag, overDagen } from '@/lib/utils';
+import { formatDate, getCustomerOptionLabel, vandaag, overDagen, projectMeta } from '@/lib/utils';
 
 const currencyOptions = [
   { value: 'EUR', label: 'EUR (€)' },
@@ -180,6 +180,7 @@ export default function NewQuote() {
           { label: 'Offertenummer', value: formData.quote_number },
           { label: 'Offertedatum', value: formatDate(formData.quote_date) },
           { label: 'Geldig tot', value: formatDate(formData.valid_until) },
+          ...projectMeta(projectOptions.find(o => o.value === formData.project_id)?.address),
         ]}
         customer={selectedCustomer}
         blocks={formData.blocks}

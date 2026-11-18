@@ -11,6 +11,8 @@ import { invoiceMeta, invoiceTitle, isCreditNote } from '@/lib/invoices';
 import { pageTitle } from '@/lib/constants';
 
 interface PublicInvoice {
+  /** Het project waar hij bij hoort; het adres komt op het document */
+  project?: { address: string | null } | null;
   id: number;
   invoice_number: string | null;
   invoice_date: string | null;
@@ -110,7 +112,7 @@ export default function PublicInvoice() {
             <div className="block">
               <DocumentPreview
                 title={title}
-                meta={invoiceMeta(invoice, invoice.credit_for)}
+                meta={invoiceMeta(invoice, invoice.credit_for, invoice.project?.address)}
                 customer={invoice.customer}
                 blocks={invoice.blocks}
                 currency={invoice.currency}

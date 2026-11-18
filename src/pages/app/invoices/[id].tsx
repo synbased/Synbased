@@ -412,7 +412,7 @@ export default function EditInvoice() {
 
       <DocumentEditor
         title={title}
-        meta={invoiceMeta(formData, creditFor)}
+        meta={invoiceMeta(formData, creditFor, projectOptions.find(o => o.value === formData.project_id)?.address)}
         customer={selectedCustomer}
         blocks={formData.blocks}
         currency={formData.currency}

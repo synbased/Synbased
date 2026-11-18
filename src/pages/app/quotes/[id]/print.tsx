@@ -4,10 +4,12 @@ import { useRouter } from 'next/router';
 import DocumentPreview, { SignatureState } from '@/components/DocumentPreview';
 import { SkeletonCard } from '@/components/Skeleton';
 import type { Customer, DocumentBlock, Tenant } from '@/lib/supabase';
-import { formatDate } from '@/lib/utils';
+import { formatDate, projectMeta } from '@/lib/utils';
 import { usePrintWhenReady } from '@/hooks/usePrintWhenReady';
 
 interface PrintQuote {
+  /** Het project waar hij bij hoort; het adres komt op het document */
+  project?: { address: string | null } | null;
   quote_number: string;
   quote_date: string;
   valid_until: string;
@@ -92,6 +94,7 @@ export default function PrintQuote() {
                 { label: 'Offertenummer', value: quote.quote_number },
                 { label: 'Offertedatum', value: formatDate(quote.quote_date) },
                 { label: 'Geldig tot', value: formatDate(quote.valid_until) },
+                ...projectMeta(quote.project?.address),
               ]}
               customer={quote.customer}
               blocks={quote.blocks}
